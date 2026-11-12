@@ -12,6 +12,11 @@ light/dark palettes.
 |---|---|---|---|
 | ![](docs/watch.png) | ![](docs/watch-rec.png) | ![](docs/phone.png) | ![](docs/phone-dark.png) |
 
+The real device, shot by the phone camera while streaming — the round display is
+why the timer sits at 10 o'clock instead of the square corner:
+
+![](docs/watch-real.jpg)
+
 ## Architecture
 
 ```

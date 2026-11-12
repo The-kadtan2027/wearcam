@@ -165,11 +165,11 @@ public class MainActivity extends Activity implements BtClient.Listener {
 
         timerPill = new TextView(this);
         pill(timerPill, "3s");
-        timerPill.setTextSize(10);
+        timerPill.setTextSize(9);
         timerPill.setOnClickListener(v -> toggleTimer());
         FrameLayout.LayoutParams timerParams = new FrameLayout.LayoutParams(
-                dp(36), dp(24), Gravity.TOP | Gravity.LEFT);
-        timerParams.setMargins(dp(10), dp(8), 0, 0);
+                dp(22), dp(22), Gravity.TOP | Gravity.LEFT);
+        timerParams.setMargins(dp(37), dp(37), 0, 0);
         root.addView(timerPill, timerParams);
         updateTimerPill();
 
@@ -215,7 +215,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
         FrameLayout.LayoutParams stripParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(31),
                 Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        stripParams.setMargins(dp(30), 0, dp(30), dp(140));
+        stripParams.setMargins(dp(36), 0, dp(36), dp(140));
         root.addView(strip, stripParams);
 
         modePill = new TextView(this);
@@ -239,7 +239,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
         TextView zoomOut = new TextView(this);
         pill(zoomOut, "1×");
         zoomOut.setOnClickListener(v -> sendCmd("Z:1"));
-        controls.addView(zoomOut, new LinearLayout.LayoutParams(dp(48), dp(32)));
+        controls.addView(zoomOut, new LinearLayout.LayoutParams(dp(42), dp(32)));
 
         shutterView = new ShutterView(this);
         shutterView.setAction(() -> {
@@ -251,14 +251,14 @@ public class MainActivity extends Activity implements BtClient.Listener {
             }
         });
         LinearLayout.LayoutParams shutterParams = new LinearLayout.LayoutParams(dp(68), dp(68));
-        shutterParams.leftMargin = dp(14);
-        shutterParams.rightMargin = dp(14);
+        shutterParams.leftMargin = dp(8);
+        shutterParams.rightMargin = dp(8);
         controls.addView(shutterView, shutterParams);
 
         TextView zoomIn = new TextView(this);
         pill(zoomIn, "3.5×");
         zoomIn.setOnClickListener(v -> sendCmd("Z:3.5"));
-        controls.addView(zoomIn, new LinearLayout.LayoutParams(dp(48), dp(32)));
+        controls.addView(zoomIn, new LinearLayout.LayoutParams(dp(42), dp(32)));
 
         FrameLayout.LayoutParams controlsParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(68),
@@ -352,7 +352,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
         timerPill.setTextColor(timerArmed ? 0xFF000000 : 0xCCFFFFFF);
         android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
         bg.setColor(timerArmed ? 0xFFFF9F0A : 0xCC1C1C1E);
-        bg.setCornerRadius(dp(16));
+        bg.setCornerRadius(dp(11));
         timerPill.setBackground(bg);
     }
 
