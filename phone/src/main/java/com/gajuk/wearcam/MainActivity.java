@@ -76,8 +76,12 @@ public class MainActivity extends Activity {
                         Settings.Secure.ACCESSIBILITY_ENABLED, 1);
                 Toast.makeText(this, "Accessibility enabled", Toast.LENGTH_SHORT).show();
             } catch (SecurityException e) {
-                Toast.makeText(this, "adb shell pm grant " + getPackageName()
-                        + " android.permission.WRITE_SECURE_SETTINGS", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Opening Accessibility — enable WearCam Phone",
+                        Toast.LENGTH_LONG).show();
+                try {
+                    startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                } catch (Exception ignored) {
+                }
             }
             refresh();
         });
