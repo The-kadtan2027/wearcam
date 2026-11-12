@@ -1,0 +1,68 @@
+# WearCam — Galaxy Watch 4 remote camera for OPPO Reno14 Pro
+
+Control the OPPO camera from a Galaxy Watch 4: live preview, shutter, video
+record, zoom presets and mode switching — no root, no Shizuku.
+
+## Architecture
+
+```
+Galaxy Watch 4 (450x450)                     OPPO Reno14 Pro 5G
+┌──────────────────────┐   RFCOMM (BT)   ┌───────────────────────────┐
+│ SurfaceView  H.264   │◀───────────────▶│ BtBridge  (server)        │
+│ strip / mode pill    │                 │ CaptureService            │
+│ 1x  3.5x  shutter    │   TCP /video    │  MediaProjection 480x1056 │
+│ status capsule       │◀───────────────▶│  H264Encoder 480x480      │
+└──────────────────────┘                 │  MjpegServer :8080        │
+                                         │ ShutterService (a11y)     │
+                                         └───────────────────────────┘
+```
+
+- **Video**: MediaCodec AVC 480×480, 30 fps target, 2.5 Mbps CBR. Same framed
+  packets over BT (RFCOMM) and Wi-Fi (`/video`); the watch prefers Wi-Fi and
+  falls back to BT automatically.
+- **Control**: BT commands `S` shutter/record, `I`/`O` pinch, `Z:<preset>`
+  zoom, `B:<x>,<y>` mode-bar tap, `T:<x>,<y>` focus, `M:<n>` mode intent.
+- **Modes**: deterministic intents discovered from the camera's launcher
+  shortcuts (`mode=0 photo, 2 portrait, 6 video`); PRO/MORE via the strip.
+- **Shutter**: accessibility click on the camera's shutter node, with a
+  coordinate fallback at `(0.5w, 0.816h)` for the video record button.
+
+## Build
+
+```
+JAVA_HOME=<jdk17> gradle assembleDebug
+adb install -r phone/build/outputs/apk/debug/phone-debug.apk
+adb install -r watch/build/outputs/apk/debug/watch-debug.apk
+```
+
+Phone: Developer options → Wireless debugging; grant Accessibility for the
+phone app (Settings → Apps → WearCam Phone → Accessibility) and the CAMERA
+permission. Watch: enable Wireless debugging for sideloading only.
+
+## Verified on hardware
+
+| Path | Encoder | Watch decoder |
+|---|---|---|
+| Wi-Fi TCP | 30.2 fps | 26.9–30.0 fps |
+| BT RFCOMM | 15.3 fps | 14.2–15.8 fps |
+
+Mode switching: `PHOTO ↔ PORTRAIT ↔ VIDEO` via intents, < 1 s, independent of
+the camera UI. Shutter writes 12.6 MP JPEGs; recording toggles the stock
+camera's recorder (verified: 40 MB clip).
+
+## Known limits
+
+- Android 14 allows one VirtualDisplay per projection, so H.264 is encoded
+  from the RGBA frames (YUV conversion on a worker thread) rather than a
+  second display.
+- Accessibility cannot read the video record button's window; the coordinate
+  fallback assumes the stock layout (`y = 0.816 × height`).
+- Wi-Fi host is configured on the watch (long-press the status capsule) and
+  persisted; BT is the fallback.
+
+## RE notes
+
+The OPPO camera exposes only `capturePreview` (a preview-frame grab) beyond the
+standard camera activities; `DebugBroadcastReceiver` and the tuning/settings
+activities are gated by OPPO system permissions. Launcher shortcuts are the
+only non-privileged way to select a camera mode.

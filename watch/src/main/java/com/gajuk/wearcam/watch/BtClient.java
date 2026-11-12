@@ -1,0 +1,162 @@
+package com.gajuk.wearcam.watch;
+
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothSocket;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+
+import java.io.DataInputStream;
+import java.io.OutputStream;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class BtClient {
+
+    public interface Listener {
+        void onFrame(Bitmap bitmap);
+
+        void onStatus(String text);
+
+        void onStrip(Bitmap bitmap);
+
+        void onVideoConfig(byte[] csd);
+
+        void onVideoFrame(byte[] data);
+
+        void onLink(String state);
+    }
+
+    private static final UUID SVC = UUID.fromString("7d8f0e10-3c2a-4f5e-9b1d-2a6c8e4f0b21");
+
+    private final BluetoothAdapter adapter;
+    private volatile Listener listener;
+    private final ExecutorService tx = Executors.newSingleThreadExecutor();
+
+    private volatile BluetoothSocket socket;
+    private volatile OutputStream out;
+    private volatile boolean running = true;
+
+    public BtClient(BluetoothAdapter adapter, Listener listener) {
+        this.adapter = adapter;
+        this.listener = listener;
+    }
+
+    public void setListener(Listener listener) {
+        this.listener = listener;
+    }
+
+    private void link(String state) {
+        Listener l = listener;
+        if (l != null) l.onLink(state);
+    }
+
+    public boolean isConnected() {
+        return out != null;
+    }
+
+    public void connect() {
+        if (adapter == null) {
+            link("bt: unavailable");
+            return;
+        }
+        if (!adapter.isEnabled()) {
+            link("bt: off");
+            return;
+        }
+        link("bt: connecting");
+        new Thread(this::doConnect, "bt-connect").start();
+    }
+
+    private void doConnect() {
+        while (running) {
+            try {
+                Set<BluetoothDevice> bonded = adapter.getBondedDevices();
+                BluetoothDevice phone = null;
+                for (BluetoothDevice d : bonded) {
+                    String name = d.getName();
+                    if (name != null && name.toLowerCase().contains("oppo")) {
+                        phone = d;
+                        break;
+                    }
+                }
+                if (phone == null) {
+                    link("bt: no phone");
+                    Thread.sleep(3000);
+                    continue;
+                }
+                BluetoothSocket s = phone.createRfcommSocketToServiceRecord(SVC);
+                socket = s;
+                s.connect();
+                out = s.getOutputStream();
+                link("bt: connected");
+                readLoop(s);
+            } catch (Exception e) {
+                out = null;
+                link("bt: retry");
+            }
+            if (!running) break;
+            try {
+                Thread.sleep(2500);
+            } catch (InterruptedException e) {
+                break;
+            }
+        }
+    }
+
+    private void readLoop(BluetoothSocket s) {
+        try {
+            DataInputStream in = new DataInputStream(s.getInputStream());
+            while (running) {
+                int type = in.readUnsignedByte();
+                int len = in.readInt();
+                if (len <= 0 || len > 2_000_000) {
+                    android.util.Log.w("WearCamW", "bad frame type=" + type + " len=" + len);
+                    break;
+                }
+                byte[] buf = new byte[len];
+                in.readFully(buf);
+                if (type == 1) {
+                    Bitmap bmp = BitmapFactory.decodeByteArray(buf, 0, len);
+                    if (bmp != null) listener.onFrame(bmp);
+                } else if (type == 2) {
+                    listener.onStatus(new String(buf));
+                } else if (type == 3) {
+                    Bitmap bmp = BitmapFactory.decodeByteArray(buf, 0, len);
+                    if (bmp != null) listener.onStrip(bmp);
+                } else if (type == 4) {
+                    listener.onVideoConfig(buf);
+                } else if (type == 5) {
+                    listener.onVideoFrame(buf);
+                }
+            }
+        } catch (Exception e) {
+            android.util.Log.w("WearCamW", "read loop: " + e);
+        } finally {
+            out = null;
+            link("bt: lost");
+        }
+    }
+
+    public void send(final String command) {
+        tx.execute(() -> {
+            OutputStream o = out;
+            if (o == null) return;
+            try {
+                o.write((command + "\n").getBytes());
+                o.flush();
+            } catch (Exception ignored) {
+            }
+        });
+    }
+
+    public void close() {
+        running = false;
+        try {
+            if (socket != null) socket.close();
+        } catch (Exception ignored) {
+        }
+    }
+}
