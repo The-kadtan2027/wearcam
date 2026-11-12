@@ -295,10 +295,17 @@ public class MainActivity extends Activity {
         b.setAllCaps(false);
         b.setTextColor(0xFFFFFFFF);
         b.setTypeface(null, Typeface.BOLD);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(cBlue);
-        bg.setCornerRadius(dp(14));
-        b.setBackground(bg);
+        GradientDrawable normal = new GradientDrawable();
+        normal.setColor(cBlue);
+        normal.setCornerRadius(dp(14));
+        GradientDrawable pressed = new GradientDrawable();
+        pressed.setColor(0xFF0A6CD6);
+        pressed.setCornerRadius(dp(14));
+        android.graphics.drawable.StateListDrawable states =
+                new android.graphics.drawable.StateListDrawable();
+        states.addState(new int[]{android.R.attr.state_pressed}, pressed);
+        states.addState(new int[]{}, normal);
+        b.setBackground(states);
         b.setStateListAnimator(null);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(52));
