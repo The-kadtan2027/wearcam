@@ -1,5 +1,9 @@
 # WearCam — Galaxy Watch 4 remote camera for OPPO Reno14 Pro
 
+![build](https://github.com/The-kadtan2027/wearcam/actions/workflows/build.yml/badge.svg)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+
 Control the OPPO camera from a Galaxy Watch 4: live preview, shutter, video
 record, zoom presets and mode switching — no root, no Shizuku.
 
