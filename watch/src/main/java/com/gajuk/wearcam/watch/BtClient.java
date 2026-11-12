@@ -6,6 +6,8 @@ import android.bluetooth.BluetoothSocket;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 
+import com.gajuk.wearcam.watch.state.LinkMachine;
+
 import java.io.DataInputStream;
 import java.io.OutputStream;
 import java.util.Set;
@@ -26,7 +28,7 @@ public class BtClient {
 
         void onVideoFrame(byte[] data);
 
-        void onLink(String state);
+        void onLink(LinkMachine.State state);
     }
 
     private static final UUID SVC = UUID.fromString("7d8f0e10-3c2a-4f5e-9b1d-2a6c8e4f0b21");
@@ -38,19 +40,23 @@ public class BtClient {
     private volatile BluetoothSocket socket;
     private volatile OutputStream out;
     private volatile boolean running = true;
+    private final LinkMachine link = new LinkMachine();
 
     public BtClient(BluetoothAdapter adapter, Listener listener) {
         this.adapter = adapter;
         this.listener = listener;
+        link.addListener((from, to, event) -> {
+            Listener l = this.listener;
+            if (l != null) l.onLink(to);
+        });
+    }
+
+    public LinkMachine link() {
+        return link;
     }
 
     public void setListener(Listener listener) {
         this.listener = listener;
-    }
-
-    private void link(String state) {
-        Listener l = listener;
-        if (l != null) l.onLink(state);
     }
 
     public boolean isConnected() {
@@ -59,14 +65,14 @@ public class BtClient {
 
     public void connect() {
         if (adapter == null) {
-            link("bt: unavailable");
+            link.send(LinkMachine.Event.UNAVAILABLE);
             return;
         }
         if (!adapter.isEnabled()) {
-            link("bt: off");
+            link.send(LinkMachine.Event.UNAVAILABLE);
             return;
         }
-        link("bt: connecting");
+        link.send(LinkMachine.Event.START);
         new Thread(this::doConnect, "bt-connect").start();
     }
 
@@ -83,7 +89,7 @@ public class BtClient {
                     }
                 }
                 if (phone == null) {
-                    link("bt: no phone");
+                    link.send(LinkMachine.Event.NO_PHONE);
                     Thread.sleep(3000);
                     continue;
                 }
@@ -91,11 +97,11 @@ public class BtClient {
                 socket = s;
                 s.connect();
                 out = s.getOutputStream();
-                link("bt: connected");
+                link.send(LinkMachine.Event.CONNECTED);
                 readLoop(s);
             } catch (Exception e) {
                 out = null;
-                link("bt: retry");
+                link.send(LinkMachine.Event.RETRY);
             }
             if (!running) break;
             try {
@@ -136,7 +142,7 @@ public class BtClient {
             android.util.Log.w("WearCamW", "read loop: " + e);
         } finally {
             out = null;
-            link("bt: lost");
+            link.send(LinkMachine.Event.LOST);
         }
     }
 

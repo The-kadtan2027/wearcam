@@ -40,6 +40,10 @@ Galaxy Watch 4 (450x450)                     OPPO Reno14 Pro 5G
 - **Timer**: the `3s` pill arms a 3-2-1 countdown before the shutter command.
 - **Recording**: the status capsule switches to a live `REC m:ss` counter and
   returns to the transport/battery line when the phone reports `STOP`.
+- **State machines**: link, transport, mode, countdown, recording (watch) and
+  capture, record (phone) are explicit enum machines with logged transitions
+  and JVM tests — see [STATE-MACHINES.md](STATE-MACHINES.md). Every transition
+  appears in logcat as `WearCamState <machine>: FROM --EVENT--> TO`.
 
 ## Build
 

@@ -41,6 +41,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        com.gajuk.wearcam.common.StateMachine.setLogger(
+                line -> android.util.Log.i("WearCamState", line));
 
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -340,7 +342,7 @@ public class MainActivity extends Activity {
                 Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
         boolean acc = enabled != null && enabled.contains(getPackageName());
         boolean svc = ShutterService.instance != null;
-        boolean stream = CaptureService.running;
+        boolean stream = CaptureService.machine().isStreaming();
         boolean link = BtBridge.isConnected();
 
         accValue.setText(acc ? "On" : "Off");

@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "wearcam"
-include ':phone', ':watch'
+include ':common', ':phone', ':watch'

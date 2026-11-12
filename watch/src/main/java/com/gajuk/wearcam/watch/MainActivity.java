@@ -23,6 +23,12 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.gajuk.wearcam.watch.state.CountdownMachine;
+import com.gajuk.wearcam.watch.state.LinkMachine;
+import com.gajuk.wearcam.watch.state.ModeMachine;
+import com.gajuk.wearcam.watch.state.RecordingMachine;
+import com.gajuk.wearcam.watch.state.TransportMachine;
+
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -42,7 +48,10 @@ public class MainActivity extends Activity implements BtClient.Listener {
     private VideoPlayer player;
     private byte[] pendingCsd;
     private WifiVideo wifiVideoClient;
-    private volatile boolean wifiVideo;
+    private final TransportMachine transport = new TransportMachine();
+    private final ModeMachine mode = new ModeMachine();
+    private final CountdownMachine countdown = new CountdownMachine();
+    private final RecordingMachine record = new RecordingMachine();
     private ImageView strip;
     private TextView status;
     private Button modeButton;
@@ -50,23 +59,18 @@ public class MainActivity extends Activity implements BtClient.Listener {
     private EditText ipField;
 
     private BtClient bt;
-    private String linkState = "idle";
-    private volatile String phoneMode = "?";
+
     private volatile String phoneDetail = "";
     private long lastStripTapAt;
     private int lastBarX;
     private int lastBarY;
     private String modeAtTap = "";
     private final android.os.Handler ui = new android.os.Handler(android.os.Looper.getMainLooper());
-    private final String[] modes = {"PHOTO", "PORTRAIT", "VIDEO"};
-    private int modeIndex = 0;
-    private int requested = -1;
+
     private TextView timerPill;
     private TextView countdownView;
     private volatile boolean timerArmed;
-    private volatile boolean recording;
-    private volatile boolean countingDown;
-    private volatile long recStartAt;
+
 
     private volatile boolean httpRunning;
     private Thread httpThread;
@@ -74,6 +78,8 @@ public class MainActivity extends Activity implements BtClient.Listener {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        com.gajuk.wearcam.common.StateMachine.setLogger(
+                line -> android.util.Log.i("WearCamState", line));
 
         if (Build.VERSION.SDK_INT >= 31
                 && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
@@ -192,7 +198,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
                 lastStripTapAt = now;
                 lastBarX = Math.round(x);
                 lastBarY = Math.round(y);
-                modeAtTap = phoneMode;
+                modeAtTap = mode.confirmed();
                 android.util.Log.i("WearCamW", "strip tap send B:" + lastBarX + "," + lastBarY);
                 sendCmd("B:" + lastBarX + "," + lastBarY);
                 ui.postDelayed(() -> setStripVisible(false), 2600);
@@ -236,7 +242,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
         shutterView.setAction(() -> {
             vibrate(30);
             if (timerArmed) {
-                if (!countingDown) countdown(3);
+                startCountdown();
             } else {
                 sendCmd("S");
             }
@@ -292,21 +298,22 @@ public class MainActivity extends Activity implements BtClient.Listener {
                 .getString("host", "192.168.1.6:8080"), new WifiVideo.Listener() {
             @Override
             public void onConfig(byte[] csd) {
-                wifiVideo = true;
                 applyVideoConfig(csd);
             }
 
             @Override
             public void onFrame(byte[] data) {
-                wifiVideo = true;
                 applyVideoFrame(data);
             }
 
             @Override
             public void onState(boolean connected) {
-                if (!connected) wifiVideo = false;
+                transport.send(connected
+                        ? TransportMachine.Event.WIFI_OPEN
+                        : TransportMachine.Event.WIFI_CLOSED);
             }
         });
+        transport.send(TransportMachine.Event.WIFI_CONNECT);
         wifiVideoClient.start();
         refreshStatus();
     }
@@ -325,7 +332,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
     private final Runnable recTick = new Runnable() {
         @Override
         public void run() {
-            if (recording) refreshStatus();
+            if (record.isRecording()) refreshStatus();
         }
     };
 
@@ -345,14 +352,27 @@ public class MainActivity extends Activity implements BtClient.Listener {
         timerPill.setBackground(bg);
     }
 
-    private void countdown(int n) {
-        if (n <= 0) {
-            countingDown = false;
-            if (countdownView != null) countdownView.setVisibility(View.GONE);
-            sendCmd("S");
-            return;
+    private void startCountdown() {
+        if (!countdown.start(3)) return;
+        showCountdown(countdown.remaining());
+        ui.postDelayed(countdownTick, 1000);
+    }
+
+    private final Runnable countdownTick = new Runnable() {
+        @Override
+        public void run() {
+            if (countdown.tick()) {
+                if (countdownView != null) countdownView.setVisibility(View.GONE);
+                sendCmd("S");
+            } else {
+                showCountdown(countdown.remaining());
+                ui.postDelayed(this, 1000);
+            }
         }
-        countingDown = true;
+    };
+
+    private void showCountdown(int n) {
+        if (countdownView == null) return;
         vibrate(20);
         countdownView.setText(String.valueOf(n));
         countdownView.setVisibility(View.VISIBLE);
@@ -360,7 +380,6 @@ public class MainActivity extends Activity implements BtClient.Listener {
         countdownView.setScaleY(0.7f);
         countdownView.setAlpha(1f);
         countdownView.animate().scaleX(1.12f).scaleY(1.12f).alpha(0.55f).setDuration(850).start();
-        ui.postDelayed(() -> countdown(n - 1), 1000);
     }
 
     private void setStripVisible(boolean show) {
@@ -376,13 +395,23 @@ public class MainActivity extends Activity implements BtClient.Listener {
     }
 
     private void cycleModeIntent() {
+        String current = mode.confirmed();
         int next;
-        if ("PHOTO".equalsIgnoreCase(phoneMode)) next = 2;
-        else if ("PORTRAIT".equalsIgnoreCase(phoneMode)) next = 6;
+        if ("PHOTO".equalsIgnoreCase(current)) next = 2;
+        else if ("PORTRAIT".equalsIgnoreCase(current)) next = 6;
         else next = 0;
+        mode.request(next == 2 ? "PORTRAIT" : next == 6 ? "VIDEO" : "PHOTO");
+        ui.removeCallbacks(modeTimeout);
+        ui.postDelayed(modeTimeout, 3000);
         sendCmd("M:" + next);
+        refreshStatus();
         vibrate(25);
     }
+
+    private final Runnable modeTimeout = () -> {
+        mode.timeout();
+        refreshStatus();
+    };
 
     private void style(Button b, String text, int bg, int fg, int size) {
         b.setText(text);
@@ -393,21 +422,6 @@ public class MainActivity extends Activity implements BtClient.Listener {
         b.setPadding(0, 0, 0, 0);
         b.setMinHeight(0);
         b.setMinimumHeight(0);
-    }
-
-    private void cycleMode() {
-        if (requested < 0) requested = modeIndexOf(phoneMode);
-        requested = (requested + 1) % modes.length;
-        phoneMode = modes[requested];
-        sendCmd("M:" + phoneMode.toLowerCase());
-        refreshStatus();
-    }
-
-    private int modeIndexOf(String name) {
-        for (int i = 0; i < modes.length; i++) {
-            if (modes[i].equalsIgnoreCase(name)) return i;
-        }
-        return 0;
     }
 
     private void onPreviewTap(View v, float x, float y) {
@@ -426,13 +440,13 @@ public class MainActivity extends Activity implements BtClient.Listener {
 
     @Override
     public void onVideoConfig(byte[] csd) {
-        if (wifiVideo) return;
+        if (transport.isWifi()) return;
         applyVideoConfig(csd);
     }
 
     @Override
     public void onVideoFrame(byte[] data) {
-        if (wifiVideo) return;
+        if (transport.isWifi()) return;
         applyVideoFrame(data);
     }
 
@@ -461,21 +475,21 @@ public class MainActivity extends Activity implements BtClient.Listener {
         if (text == null) return;
         if (text.equals("SHOT") || text.equals("STOP")) {
             vibrate(45);
-            recording = false;
+            if (record.isRecording()) record.stop();
             runOnUiThread(() -> status.setText("saved"));
             ui.postDelayed(this::refreshStatus, 1200);
             return;
         }
         if (text.equals("REC")) {
             vibrate(60);
-            recording = true;
-            recStartAt = android.os.SystemClock.elapsedRealtime();
+            record.start();
             refreshStatus();
             return;
         }
         if (text.startsWith("MODE=")) {
             String[] parts = text.split(";");
-            phoneMode = parts[0].substring(5);
+            mode.confirm(parts[0].substring(5));
+            ui.removeCallbacks(modeTimeout);
             String battery = "";
             String thermal = "";
             for (int i = 1; i < parts.length; i++) {
@@ -489,40 +503,52 @@ public class MainActivity extends Activity implements BtClient.Listener {
                 detail.append("th").append(thermal);
             }
             phoneDetail = detail.toString();
-            for (int i = 0; i < modes.length; i++) {
-                if (modes[i].equalsIgnoreCase(phoneMode)) modeIndex = i;
-            }
         }
         refreshStatus();
     }
 
     @Override
-    public void onLink(String state) {
-        linkState = state;
+    public void onLink(LinkMachine.State state) {
         refreshStatus();
     }
 
     private void refreshStatus() {
-        final boolean down = linkState.contains("retry") || linkState.contains("failed")
-                || linkState.contains("no phone") || linkState.contains("lost");
-        final String mode = phoneMode;
+        LinkMachine.State linkState = bt != null ? bt.link().state() : LinkMachine.State.IDLE;
+        final boolean connected = linkState == LinkMachine.State.CONNECTED;
+        final String modeName = mode.display();
         final String detail = phoneDetail;
         final String main;
-        if (recording) {
-            long s = (android.os.SystemClock.elapsedRealtime() - recStartAt) / 1000;
+        if (record.isRecording()) {
+            long s = record.elapsedSeconds();
             main = String.format("REC %d:%02d", s / 60, s % 60);
         } else {
-            main = wifiVideo ? "wifi" : "bt";
+            main = transport.label();
         }
-        final String text = down ? "reconnecting…"
-                : (detail.isEmpty() ? main : main + " · " + detail);
+        final String text;
+        switch (linkState) {
+            case CONNECTED:
+                text = detail.isEmpty() ? main : main + " · " + detail;
+                break;
+            case CONNECTING:
+                text = "connecting…";
+                break;
+            case RECONNECTING:
+                text = "reconnecting…";
+                break;
+            case UNAVAILABLE:
+                text = "bluetooth off";
+                break;
+            default:
+                text = "idle";
+                break;
+        }
         runOnUiThread(() -> {
-            if (spinner != null) spinner.setVisibility(down ? View.VISIBLE : View.GONE);
-            if (modePill != null) modePill.setText(mode);
-            if (shutterView != null) shutterView.setVideo("VIDEO".equalsIgnoreCase(mode));
+            if (spinner != null) spinner.setVisibility(connected ? View.GONE : View.VISIBLE);
+            if (modePill != null) modePill.setText(modeName);
+            if (shutterView != null) shutterView.setVideo("VIDEO".equalsIgnoreCase(modeName));
             if (status != null) status.setText(text);
         });
-        if (recording) {
+        if (record.isRecording()) {
             ui.removeCallbacks(recTick);
             ui.postDelayed(recTick, 1000);
         }
@@ -537,6 +563,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
         bt = KeepAlive.client();
         if (bt != null) {
             bt.setListener(this);
+            bt.send("Q");
             refreshStatus();
             return;
         }
@@ -623,6 +650,9 @@ public class MainActivity extends Activity implements BtClient.Listener {
 
     @Override
     protected void onDestroy() {
+        ui.removeCallbacks(countdownTick);
+        ui.removeCallbacks(modeTimeout);
+        countdown.cancel();
         stopHttp();
         if (bt != null) bt.setListener(null);
         super.onDestroy();

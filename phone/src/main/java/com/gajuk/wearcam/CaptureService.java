@@ -24,6 +24,8 @@ import android.os.PowerManager;
 import android.os.SystemClock;
 import android.util.Log;
 
+import com.gajuk.wearcam.state.CaptureMachine;
+
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 
@@ -35,7 +37,11 @@ public class CaptureService extends Service {
     private static final int W = 480;
     private static final int H = 1056;
 
-    public static volatile boolean running;
+    private static final CaptureMachine MACHINE = new CaptureMachine();
+
+    public static CaptureMachine machine() {
+        return MACHINE;
+    }
 
     private MediaProjection projection;
     private VirtualDisplay display;
@@ -56,6 +62,8 @@ public class CaptureService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        com.gajuk.wearcam.common.StateMachine.setLogger(
+                line -> android.util.Log.i("WearCamState", line));
         createChannel();
         server = new MjpegServer(this, 8080);
         server.start();
@@ -69,11 +77,18 @@ public class CaptureService extends Service {
 
         startForeground(NOTIF_ID, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
         Log.i(TAG, "foreground ok");
+        if (MACHINE.state() != CaptureMachine.State.IDLE
+                && MACHINE.state() != CaptureMachine.State.ERROR) {
+            Log.i(TAG, "duplicate start ignored in " + MACHINE.state());
+            return START_NOT_STICKY;
+        }
+        MACHINE.send(CaptureMachine.Event.REQUEST);
 
         MediaProjectionManager mpm = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
         int code = intent.getIntExtra("code", 0);
         Intent data = intent.getParcelableExtra("data");
         if (data == null) {
+            MACHINE.send(CaptureMachine.Event.FAILED);
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -81,6 +96,7 @@ public class CaptureService extends Service {
         projection = mpm.getMediaProjection(code, data);
         Log.i(TAG, "projection=" + (projection != null));
         if (projection == null) {
+            MACHINE.send(CaptureMachine.Event.FAILED);
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -94,6 +110,11 @@ public class CaptureService extends Service {
         projection.registerCallback(new MediaProjection.Callback() {
             @Override
             public void onStop() {
+                CaptureMachine.State state = MACHINE.state();
+                if (state == CaptureMachine.State.STARTING
+                        || state == CaptureMachine.State.STREAMING) {
+                    MACHINE.send(CaptureMachine.Event.STOP);
+                }
                 stopSelf();
             }
         }, new Handler(getMainLooper()));
@@ -117,7 +138,7 @@ public class CaptureService extends Service {
                 "wearcam:screen");
         wake.acquire();
 
-        running = true;
+        MACHINE.send(CaptureMachine.Event.STARTED);
         return START_NOT_STICKY;
     }
 
@@ -219,7 +240,7 @@ public class CaptureService extends Service {
 
     @Override
     public void onDestroy() {
-        running = false;
+        MACHINE.send(CaptureMachine.Event.DESTROYED);
         if (wake != null && wake.isHeld()) wake.release();
         if (encoder != null) encoder.stop();
         if (display != null) display.release();

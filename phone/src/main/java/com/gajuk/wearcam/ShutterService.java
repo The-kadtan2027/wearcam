@@ -8,6 +8,8 @@ import android.util.DisplayMetrics;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 
+import com.gajuk.wearcam.state.RecordMachine;
+
 public class ShutterService extends AccessibilityService {
 
     public static volatile ShutterService instance;
@@ -16,6 +18,8 @@ public class ShutterService extends AccessibilityService {
 
     @Override
     protected void onServiceConnected() {
+        com.gajuk.wearcam.common.StateMachine.setLogger(
+                line -> android.util.Log.i("WearCamState", line));
         super.onServiceConnected();
         instance = this;
     }
@@ -38,7 +42,7 @@ public class ShutterService extends AccessibilityService {
         lastModePush = now;
         String mode = currentMode();
         if (mode != null) {
-            if (!"VIDEO".equals(mode)) recording = false;
+            if (record.modeChanged("VIDEO".equals(mode))) BtBridge.sendStatus("STOP");
             BtBridge.onModeChanged(mode);
         }
     }
@@ -47,19 +51,13 @@ public class ShutterService extends AccessibilityService {
     public void onInterrupt() {
     }
 
-    private boolean recording;
+    private final RecordMachine record = new RecordMachine();
 
     public boolean clickShutter() {
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return false;
         String mode = currentMode();
-        String status;
-        if ("VIDEO".equals(mode)) {
-            recording = !recording;
-            status = recording ? "REC" : "STOP";
-        } else {
-            status = "SHOT";
-        }
+        String status = record.click("VIDEO".equals(mode));
         AccessibilityNodeInfo node = find(root, "shutter");
         if (node == null) {
             dispatchTap(realWidth() * 0.5f, realHeight() * 0.816f);
