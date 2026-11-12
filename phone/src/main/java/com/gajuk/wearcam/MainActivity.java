@@ -2,12 +2,20 @@ package com.gajuk.wearcam;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.media.projection.MediaProjectionManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -24,8 +32,11 @@ import java.util.Collections;
 public class MainActivity extends Activity {
 
     private static final int REQ_PROJ = 1001;
-    private TextView status;
-    private LinearLayout root;
+
+    private TextView accValue, svcValue, streamValue, linkValue, urlText;
+    private View accDot, svcDot, streamDot, linkDot;
+
+    private int cBg, cCard, cText, cSecondary, cSeparator, cBlue, cGreen, cRed, cGrayDot;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,80 +54,122 @@ public class MainActivity extends Activity {
             requestPermissions(new String[]{Manifest.permission.CAMERA}, 4);
         }
         BtBridge.start(this);
+        palette();
 
-        int p = dp(16);
+        getWindow().setStatusBarColor(cBg);
+        getWindow().setNavigationBarColor(cBg);
+
         ScrollView scroll = new ScrollView(this);
-        root = new LinearLayout(this);
+        scroll.setBackgroundColor(cBg);
+        scroll.setFillViewport(true);
+        LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(p, p, p, p);
+        root.setPadding(dp(20), dp(10), dp(20), dp(36));
         scroll.addView(root);
 
-        TextView title = new TextView(this);
-        title.setText("WearCam — phone side");
-        title.setTextSize(22);
-        root.addView(title);
+        root.addView(text("WearCam", 34, cText, true));
+        TextView subtitle = text("Remote camera · Galaxy Watch 4", 15, cSecondary, false);
+        LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        subLp.topMargin = dp(2);
+        root.addView(subtitle, subLp);
 
-        status = new TextView(this);
-        status.setTextSize(14);
-        status.setPadding(0, dp(8), 0, dp(8));
-        root.addView(status);
+        section(root, "STATUS");
+        LinearLayout statusCard = card();
+        accDot = dot();
+        accValue = valueText();
+        statusCard.addView(row("Accessibility", accDot, accValue));
+        statusCard.addView(separator());
+        svcDot = dot();
+        svcValue = valueText();
+        statusCard.addView(row("Shutter service", svcDot, svcValue));
+        statusCard.addView(separator());
+        streamDot = dot();
+        streamValue = valueText();
+        statusCard.addView(row("Stream", streamDot, streamValue));
+        statusCard.addView(separator());
+        linkDot = dot();
+        linkValue = valueText();
+        statusCard.addView(row("Watch link", linkDot, linkValue));
+        root.addView(statusCard, cardParams());
 
-        TextView ipView = new TextView(this);
-        ipView.setTextSize(18);
-        ipView.setText("http://" + localIp() + ":8080");
-        ipView.setPadding(0, 0, 0, dp(12));
-        root.addView(ipView);
-
-        addButton("1. Enable accessibility", v -> {
-            try {
-                Settings.Secure.putString(getContentResolver(),
-                        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
-                        getPackageName() + "/.ShutterService");
-                Settings.Secure.putInt(getContentResolver(),
-                        Settings.Secure.ACCESSIBILITY_ENABLED, 1);
-                Toast.makeText(this, "Accessibility enabled", Toast.LENGTH_SHORT).show();
-            } catch (SecurityException e) {
-                Toast.makeText(this, "Opening Accessibility — enable WearCam Phone",
-                        Toast.LENGTH_LONG).show();
-                try {
-                    startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS));
-                } catch (Exception ignored) {
-                }
-            }
-            refresh();
+        section(root, "ADDRESS");
+        LinearLayout addressCard = card();
+        urlText = text("", 16, cBlue, false);
+        urlText.setTypeface(Typeface.MONOSPACE);
+        LinearLayout addressRow = new LinearLayout(this);
+        addressRow.setOrientation(LinearLayout.HORIZONTAL);
+        addressRow.setGravity(Gravity.CENTER_VERTICAL);
+        addressRow.setPadding(dp(16), 0, dp(16), 0);
+        addressRow.setMinimumHeight(dp(52));
+        addressRow.addView(urlText, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        addressRow.addView(text("Copy", 15, cBlue, false));
+        addressRow.setOnClickListener(v -> {
+            String url = urlText.getText().toString();
+            ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("WearCam", url));
+            Toast.makeText(this, "Address copied", Toast.LENGTH_SHORT).show();
         });
+        addressRow.setBackground(ripple());
+        addressCard.addView(addressRow);
+        root.addView(addressCard, cardParams());
 
-        addButton("2. Start screen stream", v -> {
-            MediaProjectionManager mpm = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
-            Intent projection;
-            if (Build.VERSION.SDK_INT >= 35) {
-                projection = mpm.createScreenCaptureIntent(
-                        android.media.projection.MediaProjectionConfig.createConfigForDefaultDisplay());
-            } else {
-                projection = mpm.createScreenCaptureIntent();
-            }
-            startActivityForResult(projection, REQ_PROJ);
-        });
+        primary(root, "Start streaming", this::startProjection);
 
-        addButton("Stop stream", v -> {
+        LinearLayout actions = card();
+        actions.addView(actionRow("Stop stream", false, () -> {
             stopService(new Intent(this, CaptureService.class));
-            status.postDelayed(this::refresh, 500);
-        });
-
-        addButton("Test shutter now", v -> {
+            urlText.postDelayed(this::refresh, 500);
+        }));
+        actions.addView(separator());
+        actions.addView(actionRow("Test shutter", false, () -> {
             ShutterService s = ShutterService.instance;
             boolean ok = s != null && s.clickShutter();
-            Toast.makeText(this, ok ? "Shutter clicked" : "Accessibility not running", Toast.LENGTH_SHORT).show();
-        });
+            Toast.makeText(this, ok ? "Shutter clicked" : "Accessibility not running",
+                    Toast.LENGTH_SHORT).show();
+        }));
+        actions.addView(separator());
+        actions.addView(actionRow("Enable accessibility", true, this::enableAccessibility));
+        root.addView(actions, cardParams());
 
-        TextView help = new TextView(this);
-        help.setTextSize(13);
-        help.setPadding(0, dp(16), 0, 0);
-        help.setText("After starting the stream, open the OPPO Camera app and leave the screen on.\n\n"
-                + "The watch connects to the address above. Streaming holds a screen wake lock.");
-        root.addView(help);
+        TextView foot = text("Open the OPPO Camera app after starting the stream.\n"
+                + "Streaming holds a screen wake lock.", 13, cSecondary, false);
+        LinearLayout.LayoutParams footLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        footLp.topMargin = dp(28);
+        root.addView(foot, footLp);
 
         setContentView(scroll);
+        refresh();
+    }
+
+    private void startProjection() {
+        MediaProjectionManager mpm = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
+        Intent projection;
+        if (Build.VERSION.SDK_INT >= 35) {
+            projection = mpm.createScreenCaptureIntent(
+                    android.media.projection.MediaProjectionConfig.createConfigForDefaultDisplay());
+        } else {
+            projection = mpm.createScreenCaptureIntent();
+        }
+        startActivityForResult(projection, REQ_PROJ);
+    }
+
+    private void enableAccessibility() {
+        try {
+            Settings.Secure.putString(getContentResolver(),
+                    Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+                    getPackageName() + "/.ShutterService");
+            Settings.Secure.putInt(getContentResolver(), Settings.Secure.ACCESSIBILITY_ENABLED, 1);
+            Toast.makeText(this, "Accessibility enabled", Toast.LENGTH_SHORT).show();
+        } catch (SecurityException e) {
+            Toast.makeText(this, "Enable WearCam Phone in Accessibility", Toast.LENGTH_LONG).show();
+            try {
+                startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+            } catch (Exception ignored) {
+            }
+        }
         refresh();
     }
 
@@ -130,7 +183,8 @@ public class MainActivity extends Activity {
             svc.putExtra("code", resultCode);
             svc.putExtra("data", data);
             startForegroundService(svc);
-            status.setText("Streaming on port 8080 — open the camera app.");
+            Toast.makeText(this, "Streaming — open the camera app", Toast.LENGTH_SHORT).show();
+            refresh();
         }
     }
 
@@ -140,26 +194,157 @@ public class MainActivity extends Activity {
         refresh();
     }
 
-    private Button addButton(String label, View.OnClickListener l) {
-        Button b = new Button(this);
-        b.setText(label);
-        b.setAllCaps(false);
+    private void palette() {
+        boolean dark = (getResources().getConfiguration().uiMode
+                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        cBg = dark ? 0xFF000000 : 0xFFF2F2F7;
+        cCard = dark ? 0xFF1C1C1E : 0xFFFFFFFF;
+        cText = dark ? 0xFFFFFFFF : 0xFF000000;
+        cSecondary = 0xFF8E8E93;
+        cSeparator = dark ? 0xFF38383A : 0xFFC6C6C8;
+        cBlue = 0xFF007AFF;
+        cGreen = 0xFF34C759;
+        cRed = 0xFFFF3B30;
+        cGrayDot = dark ? 0xFF48484A : 0xFFC7C7CC;
+    }
+
+    private TextView text(String s, float sp, int color, boolean bold) {
+        TextView t = new TextView(this);
+        t.setText(s);
+        t.setTextSize(sp);
+        t.setTextColor(color);
+        if (bold) t.setTypeface(null, Typeface.BOLD);
+        return t;
+    }
+
+    private TextView valueText() {
+        return text("", 17, cSecondary, false);
+    }
+
+    private View dot() {
+        View v = new View(this);
+        tintDot(v, cGrayDot);
+        return v;
+    }
+
+    private void tintDot(View dot, int color) {
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setColor(color);
+        dot.setBackground(bg);
+    }
+
+    private LinearLayout row(String label, View dot, TextView value) {
+        LinearLayout r = new LinearLayout(this);
+        r.setOrientation(LinearLayout.HORIZONTAL);
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setPadding(dp(16), 0, dp(16), 0);
+        r.setMinimumHeight(dp(50));
+        LinearLayout.LayoutParams dotLp = new LinearLayout.LayoutParams(dp(8), dp(8));
+        dotLp.rightMargin = dp(10);
+        r.addView(dot, dotLp);
+        r.addView(text(label, 17, cText, false),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        r.addView(value);
+        return r;
+    }
+
+    private View separator() {
+        View v = new View(this);
+        v.setBackgroundColor(cSeparator);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(1));
+        lp.leftMargin = dp(16);
+        v.setLayoutParams(lp);
+        return v;
+    }
+
+    private LinearLayout card() {
+        LinearLayout c = new LinearLayout(this);
+        c.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(cCard);
+        bg.setCornerRadius(dp(12));
+        c.setBackground(bg);
+        c.setClipToOutline(true);
+        return c;
+    }
+
+    private LinearLayout.LayoutParams cardParams() {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.topMargin = dp(6);
-        root.addView(b, lp);
-        b.setOnClickListener(l);
-        return b;
+        lp.topMargin = dp(8);
+        return lp;
+    }
+
+    private void section(LinearLayout parent, String title) {
+        TextView t = text(title, 13, cSecondary, false);
+        t.setLetterSpacing(0.06f);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.leftMargin = dp(4);
+        lp.topMargin = dp(24);
+        lp.bottomMargin = dp(8);
+        parent.addView(t, lp);
+    }
+
+    private void primary(LinearLayout parent, String title, Runnable action) {
+        Button b = new Button(this);
+        b.setText(title);
+        b.setTextSize(17);
+        b.setAllCaps(false);
+        b.setTextColor(0xFFFFFFFF);
+        b.setTypeface(null, Typeface.BOLD);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(cBlue);
+        bg.setCornerRadius(dp(14));
+        b.setBackground(bg);
+        b.setStateListAnimator(null);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(52));
+        lp.topMargin = dp(24);
+        parent.addView(b, lp);
+        b.setOnClickListener(v -> action.run());
+    }
+
+    private LinearLayout actionRow(String title, boolean chevron, Runnable action) {
+        LinearLayout r = new LinearLayout(this);
+        r.setOrientation(LinearLayout.HORIZONTAL);
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setPadding(dp(16), 0, dp(16), 0);
+        r.setMinimumHeight(dp(52));
+        r.setBackground(ripple());
+        r.addView(text(title, 17, cBlue, false),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        if (chevron) r.addView(text("›", 20, cSecondary, false));
+        r.setOnClickListener(v -> action.run());
+        return r;
+    }
+
+    private android.graphics.drawable.Drawable ripple() {
+        TypedValue out = new TypedValue();
+        getTheme().resolveAttribute(android.R.attr.selectableItemBackground, out, true);
+        return getDrawable(out.resourceId);
     }
 
     private void refresh() {
+        if (accValue == null) return;
         String enabled = Settings.Secure.getString(getContentResolver(),
                 Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
         boolean acc = enabled != null && enabled.contains(getPackageName());
-        status.setText("Accessibility: " + (acc ? "ON" : "OFF")
-                + "  ·  Service: " + (ShutterService.instance != null ? "connected" : "not connected")
-                + "\nStream: " + (CaptureService.running ? "running on :8080" : "stopped")
-                + "  ·  BT: " + (BtBridge.isConnected() ? "watch linked" : "waiting"));
+        boolean svc = ShutterService.instance != null;
+        boolean stream = CaptureService.running;
+        boolean link = BtBridge.isConnected();
+
+        accValue.setText(acc ? "On" : "Off");
+        tintDot(accDot, acc ? cGreen : cRed);
+        svcValue.setText(svc ? "Connected" : "Off");
+        tintDot(svcDot, svc ? cGreen : cRed);
+        streamValue.setText(stream ? "Running" : "Stopped");
+        tintDot(streamDot, stream ? cGreen : cGrayDot);
+        linkValue.setText(link ? "Connected" : "Waiting");
+        tintDot(linkDot, link ? cGreen : cGrayDot);
+        if (urlText != null) urlText.setText("http://" + localIp() + ":8080");
     }
 
     private String localIp() {

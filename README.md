@@ -5,10 +5,12 @@
 
 Control the OPPO camera from a Galaxy Watch 4: live preview, shutter, video
 record, 3-second timer, zoom presets and mode switching — no root, no Shizuku.
+The phone side is an iOS-style control panel with grouped status cards and
+light/dark palettes.
 
-| Watch | Recording | Phone |
-|---|---|---|
-| ![](docs/watch.png) | ![](docs/watch-rec.png) | ![](docs/phone.png) |
+| Watch | Recording | Phone | Phone (dark) |
+|---|---|---|---|
+| ![](docs/watch.png) | ![](docs/watch-rec.png) | ![](docs/phone.png) | ![](docs/phone-dark.png) |
 
 ## Architecture
 
