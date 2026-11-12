@@ -15,7 +15,7 @@
     <application
         android:label="WearCam Phone"
         android:usesCleartextTraffic="true"
-        android:theme="@android:style/Theme.Material.Light">
+        android:theme="@style/AppTheme">
 
         <activity
             android:name=".MainActivity"

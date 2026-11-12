@@ -3,9 +3,12 @@
 ![build](https://github.com/The-kadtan2027/wearcam/actions/workflows/build.yml/badge.svg)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-
 Control the OPPO camera from a Galaxy Watch 4: live preview, shutter, video
-record, zoom presets and mode switching — no root, no Shizuku.
+record, 3-second timer, zoom presets and mode switching — no root, no Shizuku.
+
+| Watch | Recording | Phone |
+|---|---|---|
+| ![](docs/watch.png) | ![](docs/watch-rec.png) | ![](docs/phone.png) |
 
 ## Architecture
 
@@ -26,22 +29,34 @@ Galaxy Watch 4 (450x450)                     OPPO Reno14 Pro 5G
   falls back to BT automatically.
 - **Control**: BT commands `S` shutter/record, `I`/`O` pinch, `Z:<preset>`
   zoom, `B:<x>,<y>` mode-bar tap, `T:<x>,<y>` focus, `M:<n>` mode intent.
+  The phone reports `SHOT`, `REC` / `STOP` (record start/stop) and
+  `MODE=<name>;BAT=<pct>;TH=<thermal>` status lines.
 - **Modes**: deterministic intents discovered from the camera's launcher
   shortcuts (`mode=0 photo, 2 portrait, 6 video`); PRO/MORE via the strip.
 - **Shutter**: accessibility click on the camera's shutter node, with a
   coordinate fallback at `(0.5w, 0.816h)` for the video record button.
+- **Timer**: the `3s` pill arms a 3-2-1 countdown before the shutter command.
+- **Recording**: the status capsule switches to a live `REC m:ss` counter and
+  returns to the transport/battery line when the phone reports `STOP`.
 
 ## Build
 
 ```
-JAVA_HOME=<jdk17> gradle assembleDebug
+./gradlew assembleDebug
 adb install -r phone/build/outputs/apk/debug/phone-debug.apk
 adb install -r watch/build/outputs/apk/debug/watch-debug.apk
 ```
 
+CI builds both APKs on every push and publishes them with each `v*` tag.
+
 Phone: Developer options → Wireless debugging; grant Accessibility for the
 phone app (Settings → Apps → WearCam Phone → Accessibility) and the CAMERA
 permission. Watch: enable Wireless debugging for sideloading only.
+
+> Re-enabling Accessibility is required after every reinstall — Android drops
+> the service on app updates. `adb shell settings put secure
+> enabled_accessibility_services com.gajuk.wearcam/com.gajuk.wearcam.ShutterService`
+> restores it without the Settings UI.
 
 ## Verified on hardware
 
@@ -52,7 +67,18 @@ permission. Watch: enable Wireless debugging for sideloading only.
 
 Mode switching: `PHOTO ↔ PORTRAIT ↔ VIDEO` via intents, < 1 s, independent of
 the camera UI. Shutter writes 12.6 MP JPEGs; recording toggles the stock
-camera's recorder (verified: 40 MB clip).
+camera's recorder (verified: 70 MB / 116 MB clips, `REC 0:04` counter).
+
+## ColorOS 16 notes
+
+- The projection dialog is requested with `MediaProjectionConfig
+  .createConfigForDefaultDisplay()` (targetSdk 35), so it defaults to
+  **Entire screen**. If you pick **A single app** instead, ColorOS hides the
+  camera preview with "App content hidden from screen share" and the watch
+  shows black.
+- While casting, ColorOS also hides the WearCam app's own window from
+  screenshots — the phone control panel appears black in `screencap` while a
+  stream is live. The watch stream itself is unaffected.
 
 ## Known limits
 

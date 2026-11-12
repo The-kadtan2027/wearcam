@@ -37,21 +37,33 @@ public class ShutterService extends AccessibilityService {
         if (now - lastModePush < 300) return;
         lastModePush = now;
         String mode = currentMode();
-        if (mode != null) BtBridge.onModeChanged(mode);
+        if (mode != null) {
+            if (!"VIDEO".equals(mode)) recording = false;
+            BtBridge.onModeChanged(mode);
+        }
     }
 
     @Override
     public void onInterrupt() {
     }
 
+    private boolean recording;
+
     public boolean clickShutter() {
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return false;
+        String mode = currentMode();
+        String status;
+        if ("VIDEO".equals(mode)) {
+            recording = !recording;
+            status = recording ? "REC" : "STOP";
+        } else {
+            status = "SHOT";
+        }
         AccessibilityNodeInfo node = find(root, "shutter");
         if (node == null) {
-            String mode = currentMode();
             dispatchTap(realWidth() * 0.5f, realHeight() * 0.816f);
-            BtBridge.sendStatus("VIDEO".equals(mode) ? "REC" : "SHOT");
+            BtBridge.sendStatus(status);
             return true;
         }
         AccessibilityNodeInfo clickable = node;
@@ -59,13 +71,13 @@ public class ShutterService extends AccessibilityService {
             clickable = clickable.getParent();
         }
         if (clickable != null && clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-            BtBridge.sendStatus("SHOT");
+            BtBridge.sendStatus(status);
             return true;
         }
         Rect r = new Rect();
         node.getBoundsInScreen(r);
         dispatchTap(r.centerX(), r.centerY());
-        BtBridge.sendStatus("SHOT");
+        BtBridge.sendStatus(status);
         return true;
     }
 

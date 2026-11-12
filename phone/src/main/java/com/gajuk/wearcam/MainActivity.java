@@ -84,7 +84,14 @@ public class MainActivity extends Activity {
 
         addButton("2. Start screen stream", v -> {
             MediaProjectionManager mpm = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
-            startActivityForResult(mpm.createScreenCaptureIntent(), REQ_PROJ);
+            Intent projection;
+            if (Build.VERSION.SDK_INT >= 35) {
+                projection = mpm.createScreenCaptureIntent(
+                        android.media.projection.MediaProjectionConfig.createConfigForDefaultDisplay());
+            } else {
+                projection = mpm.createScreenCaptureIntent();
+            }
+            startActivityForResult(projection, REQ_PROJ);
         });
 
         addButton("Stop stream", v -> {

@@ -51,8 +51,8 @@ public class MainActivity extends Activity implements BtClient.Listener {
 
     private BtClient bt;
     private String linkState = "idle";
-    private String phoneMode = "?";
-    private String phoneDetail = "";
+    private volatile String phoneMode = "?";
+    private volatile String phoneDetail = "";
     private long lastStripTapAt;
     private int lastBarX;
     private int lastBarY;
@@ -61,6 +61,12 @@ public class MainActivity extends Activity implements BtClient.Listener {
     private final String[] modes = {"PHOTO", "PORTRAIT", "VIDEO"};
     private int modeIndex = 0;
     private int requested = -1;
+    private TextView timerPill;
+    private TextView countdownView;
+    private volatile boolean timerArmed;
+    private volatile boolean recording;
+    private volatile boolean countingDown;
+    private volatile long recStartAt;
 
     private volatile boolean httpRunning;
     private Thread httpThread;
@@ -144,12 +150,31 @@ public class MainActivity extends Activity implements BtClient.Listener {
         statusParams.setMargins(0, dp(8), 0, 0);
         root.addView(status, statusParams);
         status.setOnClickListener(v -> {
-            strip.setVisibility(strip.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+            setStripVisible(strip.getVisibility() != View.VISIBLE);
         });
         status.setOnLongClickListener(v -> {
             config.setVisibility(config.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
             return true;
         });
+
+        timerPill = new TextView(this);
+        pill(timerPill, "3s");
+        timerPill.setTextSize(10);
+        timerPill.setOnClickListener(v -> toggleTimer());
+        FrameLayout.LayoutParams timerParams = new FrameLayout.LayoutParams(
+                dp(36), dp(24), Gravity.TOP | Gravity.LEFT);
+        timerParams.setMargins(dp(10), dp(8), 0, 0);
+        root.addView(timerPill, timerParams);
+        updateTimerPill();
+
+        countdownView = new TextView(this);
+        countdownView.setTextSize(46);
+        countdownView.setTextColor(0xFFFFFFFF);
+        countdownView.setGravity(Gravity.CENTER);
+        countdownView.setShadowLayer(dp(8), 0, dp(2), 0xCC000000);
+        countdownView.setVisibility(View.GONE);
+        root.addView(countdownView, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
 
         strip = new ImageView(this);
         strip.setScaleType(ImageView.ScaleType.FIT_XY);
@@ -170,7 +195,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
                 modeAtTap = phoneMode;
                 android.util.Log.i("WearCamW", "strip tap send B:" + lastBarX + "," + lastBarY);
                 sendCmd("B:" + lastBarX + "," + lastBarY);
-                ui.postDelayed(() -> strip.setVisibility(View.GONE), 2600);
+                ui.postDelayed(() -> setStripVisible(false), 2600);
             }
             return true;
         });
@@ -190,7 +215,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
         pill(modePill, "PHOTO");
         modePill.setOnClickListener(v -> cycleModeIntent());
         modePill.setOnLongClickListener(v -> {
-            strip.setVisibility(strip.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+            setStripVisible(strip.getVisibility() != View.VISIBLE);
             return true;
         });
         FrameLayout.LayoutParams modeParams = new FrameLayout.LayoutParams(
@@ -210,7 +235,11 @@ public class MainActivity extends Activity implements BtClient.Listener {
         shutterView = new ShutterView(this);
         shutterView.setAction(() -> {
             vibrate(30);
-            sendCmd("S");
+            if (timerArmed) {
+                if (!countingDown) countdown(3);
+            } else {
+                sendCmd("S");
+            }
         });
         LinearLayout.LayoutParams shutterParams = new LinearLayout.LayoutParams(dp(68), dp(68));
         shutterParams.leftMargin = dp(14);
@@ -291,6 +320,59 @@ public class MainActivity extends Activity implements BtClient.Listener {
         bg.setColor(0xCC1C1C1E);
         bg.setCornerRadius(dp(16));
         v.setBackground(bg);
+    }
+
+    private final Runnable recTick = new Runnable() {
+        @Override
+        public void run() {
+            if (recording) refreshStatus();
+        }
+    };
+
+    private void toggleTimer() {
+        timerArmed = !timerArmed;
+        updateTimerPill();
+        vibrate(15);
+    }
+
+    private void updateTimerPill() {
+        if (timerPill == null) return;
+        timerPill.setText("3s");
+        timerPill.setTextColor(timerArmed ? 0xFF000000 : 0xCCFFFFFF);
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setColor(timerArmed ? 0xFFFF9F0A : 0xCC1C1C1E);
+        bg.setCornerRadius(dp(16));
+        timerPill.setBackground(bg);
+    }
+
+    private void countdown(int n) {
+        if (n <= 0) {
+            countingDown = false;
+            if (countdownView != null) countdownView.setVisibility(View.GONE);
+            sendCmd("S");
+            return;
+        }
+        countingDown = true;
+        vibrate(20);
+        countdownView.setText(String.valueOf(n));
+        countdownView.setVisibility(View.VISIBLE);
+        countdownView.setScaleX(0.7f);
+        countdownView.setScaleY(0.7f);
+        countdownView.setAlpha(1f);
+        countdownView.animate().scaleX(1.12f).scaleY(1.12f).alpha(0.55f).setDuration(850).start();
+        ui.postDelayed(() -> countdown(n - 1), 1000);
+    }
+
+    private void setStripVisible(boolean show) {
+        if (strip == null) return;
+        if (show) {
+            strip.setAlpha(0f);
+            strip.setVisibility(View.VISIBLE);
+            strip.animate().alpha(1f).setDuration(150).start();
+        } else {
+            strip.animate().alpha(0f).setDuration(150)
+                    .withEndAction(() -> strip.setVisibility(View.GONE)).start();
+        }
     }
 
     private void cycleModeIntent() {
@@ -377,14 +459,18 @@ public class MainActivity extends Activity implements BtClient.Listener {
     @Override
     public void onStatus(String text) {
         if (text == null) return;
-        if (text.equals("SHOT")) {
+        if (text.equals("SHOT") || text.equals("STOP")) {
             vibrate(45);
+            recording = false;
             runOnUiThread(() -> status.setText("saved"));
+            ui.postDelayed(this::refreshStatus, 1200);
             return;
         }
         if (text.equals("REC")) {
             vibrate(60);
-            runOnUiThread(() -> status.setText("recording…"));
+            recording = true;
+            recStartAt = android.os.SystemClock.elapsedRealtime();
+            refreshStatus();
             return;
         }
         if (text.startsWith("MODE=")) {
@@ -417,18 +503,29 @@ public class MainActivity extends Activity implements BtClient.Listener {
     }
 
     private void refreshStatus() {
-        boolean down = linkState.contains("retry") || linkState.contains("failed")
+        final boolean down = linkState.contains("retry") || linkState.contains("failed")
                 || linkState.contains("no phone") || linkState.contains("lost");
-        if (spinner != null) {
-            spinner.setVisibility(down ? View.VISIBLE : View.GONE);
+        final String mode = phoneMode;
+        final String detail = phoneDetail;
+        final String main;
+        if (recording) {
+            long s = (android.os.SystemClock.elapsedRealtime() - recStartAt) / 1000;
+            main = String.format("REC %d:%02d", s / 60, s % 60);
+        } else {
+            main = wifiVideo ? "wifi" : "bt";
         }
-        if (modePill != null) modePill.setText(phoneMode);
-        if (shutterView != null) shutterView.setVideo("VIDEO".equalsIgnoreCase(phoneMode));
-        String transport = wifiVideo ? "wifi" : "bt";
-        String text = down ? "reconnecting…"
-                : (phoneDetail.isEmpty() ? transport : transport + " · " + phoneDetail);
-        final String value = text;
-        runOnUiThread(() -> status.setText(value));
+        final String text = down ? "reconnecting…"
+                : (detail.isEmpty() ? main : main + " · " + detail);
+        runOnUiThread(() -> {
+            if (spinner != null) spinner.setVisibility(down ? View.VISIBLE : View.GONE);
+            if (modePill != null) modePill.setText(mode);
+            if (shutterView != null) shutterView.setVideo("VIDEO".equalsIgnoreCase(mode));
+            if (status != null) status.setText(text);
+        });
+        if (recording) {
+            ui.removeCallbacks(recTick);
+            ui.postDelayed(recTick, 1000);
+        }
     }
 
     private void sendCmd(String command) {
