@@ -151,7 +151,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
         status.setBackground(statusBg);
         status.setText("connecting");
         FrameLayout.LayoutParams statusParams = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(24),
                 Gravity.TOP | Gravity.CENTER_HORIZONTAL);
         statusParams.setMargins(0, dp(8), 0, 0);
         root.addView(status, statusParams);
@@ -201,7 +201,8 @@ public class MainActivity extends Activity implements BtClient.Listener {
                 modeAtTap = mode.confirmed();
                 android.util.Log.i("WearCamW", "strip tap send B:" + lastBarX + "," + lastBarY);
                 sendCmd("B:" + lastBarX + "," + lastBarY);
-                ui.postDelayed(() -> setStripVisible(false), 2600);
+                ui.removeCallbacks(stripHide);
+                ui.postDelayed(stripHide, 2600);
             }
             return true;
         });
@@ -212,7 +213,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
             return true;
         });
         FrameLayout.LayoutParams stripParams = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(34),
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(31),
                 Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
         stripParams.setMargins(dp(30), 0, dp(30), dp(140));
         root.addView(strip, stripParams);
@@ -224,8 +225,10 @@ public class MainActivity extends Activity implements BtClient.Listener {
             setStripVisible(strip.getVisibility() != View.VISIBLE);
             return true;
         });
+        modePill.setPadding(dp(16), 0, dp(16), 0);
         FrameLayout.LayoutParams modeParams = new FrameLayout.LayoutParams(
-                dp(96), dp(26), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(26),
+                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
         modeParams.setMargins(0, 0, 0, dp(108));
         root.addView(modePill, modeParams);
 
@@ -262,6 +265,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
                 Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
         controlsParams.setMargins(0, 0, 0, dp(30));
         root.addView(controls, controlsParams);
+        if (countdownView != null) countdownView.bringToFront();
 
         config = new LinearLayout(this);
         config.setOrientation(LinearLayout.VERTICAL);
@@ -382,12 +386,16 @@ public class MainActivity extends Activity implements BtClient.Listener {
         countdownView.animate().scaleX(1.12f).scaleY(1.12f).alpha(0.55f).setDuration(850).start();
     }
 
+    private final Runnable stripHide = () -> setStripVisible(false);
+
     private void setStripVisible(boolean show) {
         if (strip == null) return;
+        ui.removeCallbacks(stripHide);
         if (show) {
             strip.setAlpha(0f);
             strip.setVisibility(View.VISIBLE);
             strip.animate().alpha(1f).setDuration(150).start();
+            ui.postDelayed(stripHide, 4000);
         } else {
             strip.animate().alpha(0f).setDuration(150)
                     .withEndAction(() -> strip.setVisibility(View.GONE)).start();
