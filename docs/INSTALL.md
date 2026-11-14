@@ -61,6 +61,25 @@ The transfer pauses the live preview for ~1 s while the APK is written.
 The repo is MIT-licensed and builds from source; the phone app is F-Droid compatible.
 The watch APK is distributed alongside (F-Droid has no Wear OS client on the watch).
 
+## Free distribution (no store fees)
+
+- **Obtainium** (recommended for auto-updates): install Obtainium, add
+  `https://github.com/The-kadtan2027/wearcam`, and it tracks GitHub releases and installs
+  updates automatically. No account, no fee.
+- **GitHub Releases**: the signed `phone-release.apk` / `watch-release.apk`.
+- **F-Droid / IzzyOnDroid**: the recipe is in `fdroid/com.gajuk.wearcam.yml`; F-Droid's
+  buildserver needs the `android-37.0` platform (canary) — until then, an F-Droid flavor
+  without the Kadb installer can build on SDK 35.
+- **The watch app**: the phone bundles it (export / install via Wi-Fi / Bluetooth updates),
+  so no watch store is needed.
+
+## Signing
+
+Release APKs are signed with the project key (`CN=WearCam, O=WearCam, C=IN`). The keystore
+lives outside the repo; CI reads it from the `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`,
+`KEY_ALIAS` and `KEY_PASSWORD` secrets. Every future release must use the same key, or
+updates will be rejected.
+
 ## Public release plan
 
 | Channel | Phone app | Watch app | Notes |

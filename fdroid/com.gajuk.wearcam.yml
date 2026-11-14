@@ -1,0 +1,23 @@
+Categories:
+  - Camera
+License: MIT
+WebSite: https://github.com/The-kadtan2027/wearcam
+SourceCode: https://github.com/The-kadtan2027/wearcam
+IssueTracker: https://github.com/The-kadtan2027/wearcam/issues
+RepoType: git
+Repo: https://github.com/The-kadtan2027/wearcam.git
+
+Builds:
+  - versionName: 1.7.0
+    versionCode: 170
+    commit: v1.7.2
+    subdir: .
+    gradle:
+      - assembleRelease
+    prebuild: sed -i 's/android.useAndroidX=false/android.useAndroidX=true/' gradle.properties || true
+    # NOTE: requires SDK platform android-37.0 (canary channel) for the Kadb dependency.
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 1.7.0
+CurrentVersionCode: 170

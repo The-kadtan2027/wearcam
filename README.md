@@ -109,7 +109,8 @@ The watch stream targets low, **bounded** latency rather than maximum frame rate
 
 ## Install
 
-- **Phone**: download `phone-debug.apk` from the latest release and install it.
+- **Phone**: download `phone-release.apk` from the latest release and install it
+  (or add the repo to [Obtainium](https://github.com/ImranR98/Obtainium) for auto-updates).
 - **Watch**: the phone app bundles the watch APK — **Watch app → Export & share APK**,
   then sideload it over wireless debugging (steps in [docs/INSTALL.md](docs/INSTALL.md)).
   A Google Play Wear OS listing is the planned one-tap path.
