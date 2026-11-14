@@ -34,14 +34,14 @@ jobs:
       - name: Build APKs
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleRelease --no-daemon --stacktrace
 
       - uses: actions/upload-artifact@v4
         with:
           name: apks
           path: |
-            phone/build/outputs/apk/debug/phone-debug.apk
-            watch/build/outputs/apk/debug/watch-debug.apk
+            phone/build/outputs/apk/release/phone-release.apk
+            watch/build/outputs/apk/release/watch-release.apk
 
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -49,5 +49,5 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            phone/build/outputs/apk/debug/phone-debug.apk
-            watch/build/outputs/apk/debug/watch-debug.apk
+            phone/build/outputs/apk/release/phone-release.apk
+            watch/build/outputs/apk/release/watch-release.apk
