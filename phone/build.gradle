@@ -24,6 +24,24 @@ android {
             minifyEnabled false
         }
     }
+
+    sourceSets {
+        main {
+            assets.srcDirs += "$buildDir/generated/assets"
+        }
+    }
+}
+
+// Bundle the watch APK so the phone app can export/share it for sideloading.
+tasks.register('copyWatchApk', Copy) {
+    dependsOn ':watch:assembleDebug'
+    from "${rootProject.projectDir}/watch/build/outputs/apk/debug/watch-debug.apk"
+    into "${buildDir}/generated/assets"
+    rename { 'watch.apk' }
+}
+
+tasks.named('preBuild') {
+    dependsOn 'copyWatchApk'
 }
 
 dependencies {

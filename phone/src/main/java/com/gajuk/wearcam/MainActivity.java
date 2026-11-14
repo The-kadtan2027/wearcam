@@ -138,6 +138,19 @@ public class MainActivity extends Activity {
                 () -> startActivity(new Intent(this, CalibrationActivity.class))));
         root.addView(actions, cardParams());
 
+        section(root, "WATCH APP");
+        LinearLayout watchCard = card();
+        View watchDot = dot();
+        tintDot(watchDot, cGreen);
+        TextView bundled = valueText();
+        bundled.setText("Bundled");
+        watchCard.addView(row("Watch app", watchDot, bundled));
+        watchCard.addView(separator());
+        watchCard.addView(actionRow("Export & share APK", true, this::exportWatchApk));
+        watchCard.addView(separator());
+        watchCard.addView(actionRow("Install guide", true, this::showInstallGuide));
+        root.addView(watchCard, cardParams());
+
         TextView foot = text("Open the OPPO Camera app after starting the stream.\n"
                 + "Streaming holds a screen wake lock.", 13, cSecondary, false);
         LinearLayout.LayoutParams footLp = new LinearLayout.LayoutParams(
@@ -147,6 +160,63 @@ public class MainActivity extends Activity {
 
         setContentView(scroll);
         refresh();
+    }
+
+    private void exportWatchApk() {
+        new Thread(() -> {
+            try {
+                java.io.InputStream in = getAssets().open("watch.apk");
+                java.io.File cache = new java.io.File(getCacheDir(), "WearCam-watch.apk");
+                java.io.FileOutputStream fileOut = new java.io.FileOutputStream(cache);
+                byte[] buffer = new byte[65536];
+                int read;
+                while ((read = in.read(buffer)) > 0) fileOut.write(buffer, 0, read);
+                fileOut.close();
+                in.close();
+
+                android.content.ContentValues values = new android.content.ContentValues();
+                values.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME,
+                        "WearCam-watch.apk");
+                values.put(android.provider.MediaStore.MediaColumns.MIME_TYPE,
+                        "application/vnd.android.package-archive");
+                values.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,
+                        android.os.Environment.DIRECTORY_DOWNLOADS);
+                android.net.Uri uri = getContentResolver().insert(
+                        android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                if (uri == null) throw new java.io.IOException("downloads insert failed");
+                java.io.OutputStream out = getContentResolver().openOutputStream(uri);
+                java.io.FileInputStream fileIn = new java.io.FileInputStream(cache);
+                while ((read = fileIn.read(buffer)) > 0) out.write(buffer, 0, read);
+                out.close();
+                fileIn.close();
+                runOnUiThread(() -> {
+                    Toast.makeText(this, "Saved to Downloads/WearCam-watch.apk",
+                            Toast.LENGTH_SHORT).show();
+                    Intent share = new Intent(Intent.ACTION_SEND);
+                    share.setType("application/vnd.android.package-archive");
+                    share.putExtra(Intent.EXTRA_STREAM, uri);
+                    share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(Intent.createChooser(share, "Send the watch app"));
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(this, "Export failed: " + e,
+                        Toast.LENGTH_LONG).show());
+            }
+        }, "watch-apk-export").start();
+    }
+
+    private void showInstallGuide() {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Install on the watch")
+                .setMessage("1. On the watch: Settings → About → tap Build number 7×.\n\n"
+                        + "2. Developer options → Wireless debugging → turn on; note the IP:port.\n\n"
+                        + "3. On a PC: adb connect <watch-ip>:<port>, then "
+                        + "adb install WearCam-watch.apk\n\n"
+                        + "4. The APK is in Downloads after Export & share.\n\n"
+                        + "When the app is on Google Play, the watch's Play Store installs it "
+                        + "with one tap instead.")
+                .setPositiveButton("OK", null)
+                .show();
     }
 
     private void startProjection() {

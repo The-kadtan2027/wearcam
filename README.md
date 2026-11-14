@@ -107,6 +107,13 @@ The watch stream targets low, **bounded** latency rather than maximum frame rate
   watch estimates the clock offset and logs
   `dec fps=… in=… drop=… latency avg=…ms max=…ms`.
 
+## Install
+
+- **Phone**: download `phone-debug.apk` from the latest release and install it.
+- **Watch**: the phone app bundles the watch APK — **Watch app → Export & share APK**,
+  then sideload it over wireless debugging (steps in [docs/INSTALL.md](docs/INSTALL.md)).
+  A Google Play Wear OS listing is the planned one-tap path.
+
 ## Build
 
 ```
