@@ -314,8 +314,8 @@ public class MainActivity extends Activity implements BtClient.Listener {
             }
 
             @Override
-            public void onFrame(byte[] data) {
-                applyVideoFrame(data);
+            public void onFrame(byte[] data, long tsUs) {
+                applyVideoFrame(data, tsUs);
             }
 
             @Override
@@ -501,9 +501,9 @@ public class MainActivity extends Activity implements BtClient.Listener {
     }
 
     @Override
-    public void onVideoFrame(byte[] data) {
+    public void onVideoFrame(byte[] data, long tsUs) {
         if (transport.isWifi()) return;
-        applyVideoFrame(data);
+        applyVideoFrame(data, tsUs);
     }
 
     private void applyVideoConfig(byte[] csd) {
@@ -513,9 +513,9 @@ public class MainActivity extends Activity implements BtClient.Listener {
         });
     }
 
-    private void applyVideoFrame(byte[] data) {
+    private void applyVideoFrame(byte[] data, long tsUs) {
         VideoPlayer p = player;
-        if (p != null) p.feed(data);
+        if (p != null) p.feed(data, tsUs);
         runOnUiThread(() -> {
             if (preview.getVisibility() != View.GONE) preview.setVisibility(View.GONE);
         });
@@ -556,6 +556,12 @@ public class MainActivity extends Activity implements BtClient.Listener {
                 }
                 if (parts[i].startsWith("ZOOM=")) {
                     applyZoomLabels(parts[i].substring(5));
+                }
+                if (parts[i].startsWith("UP=")) {
+                    try {
+                        ClockSync.sample(Long.parseLong(parts[i].substring(3)));
+                    } catch (NumberFormatException ignored) {
+                    }
                 }
             }
             StringBuilder detail = new StringBuilder();

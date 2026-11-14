@@ -83,6 +83,23 @@ this camera's modes instead of the OPPO defaults.
 
 Without a calibration the generic accessibility heuristics apply.
 
+## Latency
+
+The watch stream targets low, **bounded** latency rather than maximum frame rate:
+
+- The watch stamps decoder input with the frame's arrival time instead of a synthetic PTS, so
+  the renderer never paces behind real time.
+- Frames older than 150 ms are dropped **before** the decoder: MediaCodec's internal queue is
+  unbounded, so age-based dropping is what keeps end-to-end latency flat instead of growing.
+- The encoder keeps only the newest frame (latest-wins queue) and uses Baseline AVC (no
+  B-frames) with a low-latency hint.
+- TCP fan-out uses one sender thread per client with a two-packet drop-oldest queue, so a slow
+  client can never stall the encoder.
+- The watch uses a raw TCP socket with `TCP_NODELAY` and a 1 MiB receive buffer.
+- Status lines carry `UP=` (phone uptime) and video frames carry their capture timestamp; the
+  watch estimates the clock offset and logs
+  `dec fps=… in=… drop=… latency avg=…ms max=…ms`.
+
 ## Build
 
 ```

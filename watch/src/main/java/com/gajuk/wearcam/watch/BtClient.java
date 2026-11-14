@@ -26,7 +26,7 @@ public class BtClient {
 
         void onVideoConfig(byte[] csd);
 
-        void onVideoFrame(byte[] data);
+        void onVideoFrame(byte[] data, long tsUs);
 
         void onLink(LinkMachine.State state);
     }
@@ -135,7 +135,13 @@ public class BtClient {
                 } else if (type == 4) {
                     listener.onVideoConfig(buf);
                 } else if (type == 5) {
-                    listener.onVideoFrame(buf);
+                    listener.onVideoFrame(buf, 0);
+                } else if (type == 6 && len >= 8) {
+                    long ts = 0;
+                    for (int i = 0; i < 8; i++) ts = (ts << 8) | (buf[i] & 0xFF);
+                    byte[] nal = new byte[len - 8];
+                    System.arraycopy(buf, 8, nal, 0, nal.length);
+                    listener.onVideoFrame(nal, ts);
                 }
             }
         } catch (Exception e) {

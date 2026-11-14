@@ -18,14 +18,14 @@ public class H264Encoder {
     private MediaCodec codec;
     private Thread drainThread;
     private volatile boolean running;
-    private long pts;
+    private volatile long latestCaptureUs;
     private boolean configSent;
     private int frameCount;
     private long fpsMark;
 
     private int[] argb;
     private final java.util.concurrent.ArrayBlockingQueue<Bitmap> queue =
-            new java.util.concurrent.ArrayBlockingQueue<>(2);
+            new java.util.concurrent.ArrayBlockingQueue<>(1);
     private final java.util.concurrent.ArrayBlockingQueue<Bitmap> free =
             new java.util.concurrent.ArrayBlockingQueue<>(3);
     private Thread worker;
@@ -48,6 +48,13 @@ public class H264Encoder {
         format.setInteger(MediaFormat.KEY_BITRATE_MODE,
                 MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR);
         format.setInteger(MediaFormat.KEY_OPERATING_RATE, fps);
+        try {
+            format.setInteger(MediaFormat.KEY_PROFILE,
+                    MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline);
+            format.setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0);
+            format.setInteger(MediaFormat.KEY_LATENCY, 1);
+        } catch (Exception ignored) {
+        }
 
         codec = MediaCodec.createEncoderByType("video/avc");
         codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
@@ -82,9 +89,10 @@ public class H264Encoder {
 
     public void submit(Bitmap bitmap) {
         if (bitmap == null) return;
-        if (!queue.offer(bitmap)) {
-            free.offer(bitmap);
-        }
+        latestCaptureUs = android.os.SystemClock.elapsedRealtime() * 1000;
+        Bitmap stale = queue.poll();
+        if (stale != null) free.offer(stale);
+        if (!queue.offer(bitmap)) free.offer(bitmap);
     }
 
     private void workerLoop() {
@@ -97,10 +105,10 @@ public class H264Encoder {
                         Image image = codec.getInputImage(index);
                         if (image != null) {
                             convert(bitmap, image);
-                            codec.queueInputBuffer(index, 0, width * height * 3 / 2, pts, 0);
-                            pts += 1_000_000 / fps;
+                            codec.queueInputBuffer(index, 0, width * height * 3 / 2,
+                                    latestCaptureUs, 0);
                         } else {
-                            codec.queueInputBuffer(index, 0, 0, pts, 0);
+                            codec.queueInputBuffer(index, 0, 0, latestCaptureUs, 0);
                         }
                     }
                 } finally {
@@ -183,8 +191,14 @@ public class H264Encoder {
                                 } catch (Exception ignored) {
                                 }
                             }
-                            BtBridge.sendVideoFrame(data);
-                            VideoHub.broadcast(BtBridge.packet(5, data));
+                            byte[] payload = new byte[8 + data.length];
+                            long captureUs = info.presentationTimeUs;
+                            for (int i = 0; i < 8; i++) {
+                                payload[7 - i] = (byte) (captureUs >>> (8 * i));
+                            }
+                            System.arraycopy(data, 0, payload, 8, data.length);
+                            BtBridge.sendVideoFrame(payload);
+                            VideoHub.broadcast(BtBridge.packet(6, payload));
                             frameCount++;
                             long now = android.os.SystemClock.uptimeMillis();
                             if (fpsMark == 0) fpsMark = now;

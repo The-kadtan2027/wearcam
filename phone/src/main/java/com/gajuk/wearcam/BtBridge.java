@@ -236,7 +236,8 @@ public class BtBridge {
             zoom = service.zoomLabels();
         }
         return "MODE=" + mode + ";BAT=" + battery + ";TH=" + thermal
-                + ";MODES=" + modes + ";ZOOM=" + zoom;
+                + ";MODES=" + modes + ";ZOOM=" + zoom
+                + ";UP=" + SystemClock.elapsedRealtime();
     }
 
     public static void sendStatus(String text) {
@@ -256,8 +257,8 @@ public class BtBridge {
         offer(packet(4, csd));
     }
 
-    public static void sendVideoFrame(byte[] frame) {
-        offer(packet(5, frame));
+    public static void sendVideoFrame(byte[] payload) {
+        offer(packet(6, payload));
     }
 
     public static void setKeyframeRequest(Runnable r) {
