@@ -28,6 +28,8 @@ public class BtClient {
 
         void onVideoFrame(byte[] data, long tsUs);
 
+        void onApkChunk(int total, int offset, byte[] data, int dataOffset, int length);
+
         void onLink(LinkMachine.State state);
     }
 
@@ -136,6 +138,12 @@ public class BtClient {
                     listener.onVideoConfig(buf);
                 } else if (type == 5) {
                     listener.onVideoFrame(buf, 0);
+                } else if (type == 7 && len >= 8) {
+                    int total = ((buf[0] & 0xFF) << 24) | ((buf[1] & 0xFF) << 16)
+                            | ((buf[2] & 0xFF) << 8) | (buf[3] & 0xFF);
+                    int offset = ((buf[4] & 0xFF) << 24) | ((buf[5] & 0xFF) << 16)
+                            | ((buf[6] & 0xFF) << 8) | (buf[7] & 0xFF);
+                    listener.onApkChunk(total, offset, buf, 8, len - 8);
                 } else if (type == 6 && len >= 8) {
                     long ts = 0;
                     for (int i = 0; i < 8; i++) ts = (ts << 8) | (buf[i] & 0xFF);

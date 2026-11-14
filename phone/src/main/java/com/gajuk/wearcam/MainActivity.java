@@ -148,6 +148,8 @@ public class MainActivity extends Activity {
         watchCard.addView(separator());
         watchCard.addView(actionRow("Export & share APK", true, this::exportWatchApk));
         watchCard.addView(separator());
+        watchCard.addView(actionRow("Send update to watch", true, this::sendUpdateToWatch));
+        watchCard.addView(separator());
         watchCard.addView(actionRow("Install guide", true, this::showInstallGuide));
         root.addView(watchCard, cardParams());
 
@@ -203,6 +205,26 @@ public class MainActivity extends Activity {
                         Toast.LENGTH_LONG).show());
             }
         }, "watch-apk-export").start();
+    }
+
+    private void sendUpdateToWatch() {
+        new Thread(() -> {
+            try {
+                java.io.InputStream in = getAssets().open("watch.apk");
+                java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+                byte[] buffer = new byte[65536];
+                int read;
+                while ((read = in.read(buffer)) > 0) bytes.write(buffer, 0, read);
+                in.close();
+                boolean sent = BtBridge.sendApk(bytes.toByteArray());
+                runOnUiThread(() -> Toast.makeText(this, sent
+                        ? "Sending the watch update over Bluetooth…"
+                        : "Watch not connected over Bluetooth", Toast.LENGTH_SHORT).show());
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(this, "Update failed: " + e,
+                        Toast.LENGTH_LONG).show());
+            }
+        }, "watch-apk-send").start();
     }
 
     private void showInstallGuide() {

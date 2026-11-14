@@ -83,6 +83,8 @@ public class MainActivity extends Activity implements BtClient.Listener {
     private volatile boolean httpRunning;
     private volatile long lastWifiFrameAt;
     private volatile long lastFrameAt;
+    private volatile java.io.File apkFile;
+    private volatile int apkTotal;
     private android.net.wifi.WifiManager.WifiLock wifiLock;
     private android.os.PowerManager.WakeLock wakeLock;
     private Thread httpThread;
@@ -468,6 +470,27 @@ public class MainActivity extends Activity implements BtClient.Listener {
         vibrate(25);
     }
 
+    private void installUpdate() {
+        java.io.File file = apkFile;
+        if (file == null || !file.exists() || (apkTotal > 0 && file.length() != apkTotal)) {
+            return;
+        }
+        runOnUiThread(() -> {
+            try {
+                android.net.Uri uri = android.net.Uri.parse(
+                        "content://com.gajuk.wearcam.watch.apk/update");
+                android.content.Intent intent = new android.content.Intent(
+                        android.content.Intent.ACTION_VIEW);
+                intent.setDataAndType(uri, "application/vnd.android.package-archive");
+                intent.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        | android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
+            } catch (Exception e) {
+                android.util.Log.w("WearCamW", "install: " + e);
+            }
+        });
+    }
+
     private void applyZoomLabels(String csv) {
         List<String> labels = ModeList.parse(csv);
         if (labels.size() < 2) return;
@@ -535,6 +558,20 @@ public class MainActivity extends Activity implements BtClient.Listener {
     }
 
     @Override
+    public void onApkChunk(int total, int offset, byte[] data, int dataOffset, int length) {
+        try {
+            if (apkFile == null) apkFile = new java.io.File(getCacheDir(), "update.apk");
+            java.io.RandomAccessFile file = new java.io.RandomAccessFile(apkFile, "rw");
+            file.seek(offset);
+            file.write(data, dataOffset, length);
+            file.close();
+            apkTotal = total;
+        } catch (Exception e) {
+            android.util.Log.w("WearCamW", "apk chunk: " + e);
+        }
+    }
+
+    @Override
     public void onVideoFrame(byte[] data, long tsUs) {
         // Prefer Wi-Fi, but keep the BT H.264 stream as a live fallback: when the Wi-Fi
         // link stalls (Wear OS power save) no frames arrive for seconds, and dropping BT
@@ -570,6 +607,10 @@ public class MainActivity extends Activity implements BtClient.Listener {
     @Override
     public void onStatus(String text) {
         if (text == null) return;
+        if (text.equals("APK_DONE")) {
+            installUpdate();
+            return;
+        }
         if (text.equals("SHOT") || text.equals("STOP")) {
             vibrate(45);
             if (record.isRecording()) record.stop();

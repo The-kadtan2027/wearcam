@@ -33,6 +33,16 @@ The phone app ships the watch APK:
 
 Any Wear OS sideload helper (for example a phone-side ADB tool) can replace the PC step.
 
+### Updating the watch app over Bluetooth (no PC)
+
+Once the watch app is installed, updates travel over the existing RFCOMM link:
+
+1. Phone app → **WATCH APP → Send update to watch**.
+2. The APK streams over Bluetooth; the watch opens the system installer.
+3. Confirm **Install** (one-time: allow WearCam to install unknown apps).
+
+The transfer pauses the live preview for ~1 s while the APK is written.
+
 ### Option C — F-Droid (planned)
 
 The repo is MIT-licensed and builds from source; the phone app is F-Droid compatible.

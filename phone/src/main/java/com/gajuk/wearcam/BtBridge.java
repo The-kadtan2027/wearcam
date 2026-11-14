@@ -260,6 +260,40 @@ public class BtBridge {
         offer(packet(4, csd));
     }
 
+    /** Streams an APK to the watch over the control link (synchronous, reliable chunks). */
+    public static boolean sendApk(byte[] apk) {
+        if (apk == null || apk.length == 0 || out == null) return false;
+        new Thread(() -> {
+            try {
+                synchronized (WRITE_LOCK) {
+                    OutputStream stream = out;
+                    if (stream == null) return;
+                    int chunk = 8192;
+                    for (int offset = 0; offset < apk.length; offset += chunk) {
+                        int length = Math.min(chunk, apk.length - offset);
+                        byte[] payload = new byte[8 + length];
+                        payload[0] = (byte) (apk.length >>> 24);
+                        payload[1] = (byte) (apk.length >>> 16);
+                        payload[2] = (byte) (apk.length >>> 8);
+                        payload[3] = (byte) apk.length;
+                        payload[4] = (byte) (offset >>> 24);
+                        payload[5] = (byte) (offset >>> 16);
+                        payload[6] = (byte) (offset >>> 8);
+                        payload[7] = (byte) offset;
+                        System.arraycopy(apk, offset, payload, 8, length);
+                        stream.write(packet(7, payload));
+                        stream.flush();
+                    }
+                    stream.write(packet(2, "APK_DONE".getBytes()));
+                    stream.flush();
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "apk send: " + e);
+            }
+        }, "bt-apk").start();
+        return true;
+    }
+
     public static void sendVideoFrame(byte[] payload) {
         offer(packet(6, payload));
     }
