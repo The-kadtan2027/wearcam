@@ -31,6 +31,19 @@ jobs:
           yes | "$SDKMANAGER" --licenses > /dev/null || true
           "$SDKMANAGER" --channel=3 "platforms;android-37.0" "build-tools;37.0.0" > /dev/null
 
+      - name: Version
+        id: version
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="0.0.${GITHUB_RUN_NUMBER}"
+          fi
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          CODE=$((MAJOR*10000 + MINOR*100 + PATCH))
+          echo "name=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/wearcam.jks"
 
@@ -40,6 +53,8 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon --stacktrace
@@ -51,11 +66,19 @@ jobs:
             phone/build/outputs/apk/release/phone-release.apk
             watch/build/outputs/apk/release/watch-release.apk
 
+      - name: Prepare release assets
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          cp phone/build/outputs/apk/release/phone-release.apk \
+             "wearcam-phone-${{ steps.version.outputs.name }}.apk"
+          cp watch/build/outputs/apk/release/watch-release.apk \
+             "wearcam-watch-${{ steps.version.outputs.name }}.apk"
+
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
-            phone/build/outputs/apk/release/phone-release.apk
-            watch/build/outputs/apk/release/watch-release.apk
+            wearcam-phone-${{ steps.version.outputs.name }}.apk
+            wearcam-watch-${{ steps.version.outputs.name }}.apk

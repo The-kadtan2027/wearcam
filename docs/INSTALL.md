@@ -63,9 +63,13 @@ The watch APK is distributed alongside (F-Droid has no Wear OS client on the wat
 
 ## Free distribution (no store fees)
 
-- **Obtainium** (recommended for auto-updates): install Obtainium, add
-  `https://github.com/The-kadtan2027/wearcam`, and it tracks GitHub releases and installs
-  updates automatically. No account, no fee.
+- **Obtainium** (recommended for auto-updates, free, no account):
+  1. Install [Obtainium](https://github.com/ImranR98/Obtainium).
+  2. Add the URL `https://github.com/The-kadtan2027/wearcam`.
+  3. Set **APK filter** to `wearcam-phone-` (the release contains the phone and watch APKs;
+     the watch one is `wearcam-watch-*`).
+  4. Obtainium tracks every release and installs updates automatically — the same
+     experience as a store, without the $25 fee.
 - **GitHub Releases**: the signed `phone-release.apk` / `watch-release.apk`.
 - **F-Droid / IzzyOnDroid**: the recipe is in `fdroid/com.gajuk.wearcam.yml`; F-Droid's
   buildserver needs the `android-37.0` platform (canary) — until then, an F-Droid flavor

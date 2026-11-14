@@ -2,6 +2,9 @@ plugins {
     id 'com.android.application'
 }
 
+def versionNameValue = System.getenv("VERSION_NAME") ?: "1.8.0"
+def versionCodeValue = Integer.parseInt(System.getenv("VERSION_CODE") ?: "10800")
+
 android {
     namespace 'com.gajuk.wearcam'
     compileSdk 37
@@ -10,8 +13,8 @@ android {
         applicationId "com.gajuk.wearcam"
         minSdk 29
         targetSdk 35
-        versionCode 170
-        versionName "1.7.0"
+        versionCode versionCodeValue
+        versionName versionNameValue
     }
 
     compileOptions {
