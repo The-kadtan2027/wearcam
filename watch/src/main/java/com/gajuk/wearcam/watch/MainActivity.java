@@ -82,6 +82,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
 
     private volatile boolean httpRunning;
     private volatile long lastWifiFrameAt;
+    private volatile long lastFrameAt;
     private android.net.wifi.WifiManager.WifiLock wifiLock;
     private android.os.PowerManager.WakeLock wakeLock;
     private Thread httpThread;
@@ -351,6 +352,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
         });
         transport.send(TransportMachine.Event.WIFI_CONNECT);
         wifiVideoClient.start();
+        ui.postDelayed(statusTick, 1000);
         refreshStatus();
     }
 
@@ -364,6 +366,14 @@ public class MainActivity extends Activity implements BtClient.Listener {
         bg.setCornerRadius(dp(16));
         v.setBackground(bg);
     }
+
+    private final Runnable statusTick = new Runnable() {
+        @Override
+        public void run() {
+            refreshStatus();
+            ui.postDelayed(this, 1000);
+        }
+    };
 
     private final Runnable recTick = new Runnable() {
         @Override
@@ -544,6 +554,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
     }
 
     private void applyVideoFrame(byte[] data, long tsUs, long maxAgeMs) {
+        lastFrameAt = android.os.SystemClock.elapsedRealtime();
         VideoPlayer p = player;
         if (p != null) p.feed(data, tsUs, maxAgeMs);
         runOnUiThread(() -> {
@@ -622,10 +633,16 @@ public class MainActivity extends Activity implements BtClient.Listener {
         } else {
             main = transport.label();
         }
+        final boolean noVideo = connected
+                && android.os.SystemClock.elapsedRealtime() - lastFrameAt > 2500;
         final String text;
         switch (linkState) {
             case CONNECTED:
-                text = detail.isEmpty() ? main : main + " · " + detail;
+                if (noVideo) {
+                    text = "waiting for video…";
+                } else {
+                    text = detail.isEmpty() ? main : main + " · " + detail;
+                }
                 break;
             case CONNECTING:
                 text = "connecting…";
@@ -748,6 +765,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
 
     @Override
     protected void onDestroy() {
+        ui.removeCallbacks(statusTick);
         ui.removeCallbacks(countdownTick);
         ui.removeCallbacks(modeTimeout);
         countdown.cancel();

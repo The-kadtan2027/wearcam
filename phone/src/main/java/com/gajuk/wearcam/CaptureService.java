@@ -56,6 +56,7 @@ public class CaptureService extends Service {
     private long lastStripAt;
     private final Paint btPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
     private long lastFrameAt;
+    private long lastImageAt;
     private long lastBtAt;
     private long nextH264At;
 
@@ -139,6 +140,20 @@ public class CaptureService extends Service {
         wake.acquire();
 
         MACHINE.send(CaptureMachine.Event.STARTED);
+        new Thread(() -> {
+            while (MACHINE.isStreaming()) {
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException ignored) {
+                    break;
+                }
+                long idle = SystemClock.uptimeMillis() - lastImageAt;
+                if (lastImageAt > 0 && idle > 3000) {
+                    Log.w(TAG, "no projection frames for " + idle
+                            + "ms — screen off or static?");
+                }
+            }
+        }, "capture-watchdog").start();
         return START_NOT_STICKY;
     }
 
@@ -150,6 +165,7 @@ public class CaptureService extends Service {
             return;
         }
         lastFrameAt = now;
+        lastImageAt = now;
         try {
             Image.Plane plane = image.getPlanes()[0];
             ByteBuffer buffer = plane.getBuffer();
