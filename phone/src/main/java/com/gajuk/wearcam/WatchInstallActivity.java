@@ -48,6 +48,12 @@ public class WatchInstallActivity extends Activity {
                 + "4. Pair & install — the watch app is pushed over Wi-Fi.");
         root.addView(help);
 
+        Button find = new Button(this);
+        find.setText("Find watch automatically");
+        find.setAllCaps(false);
+        find.setOnClickListener(v -> findWatch());
+        root.addView(find);
+
         pairingEndpoint = field("Pairing IP:port (e.g. 192.168.1.19:37000)",
                 InputType.TYPE_CLASS_TEXT);
         root.addView(pairingEndpoint);
@@ -69,6 +75,40 @@ public class WatchInstallActivity extends Activity {
         root.addView(install);
 
         setContentView(root);
+    }
+
+    private WatchDiscovery discovery;
+
+    private void findWatch() {
+        if (discovery != null) return;
+        status.setText("Searching for the watch…");
+        discovery = new WatchDiscovery(this, new WatchDiscovery.Listener() {
+            @Override
+            public void onFound(String pairingHost, int pairingPort,
+                                String connectHost, int connectPort) {
+                runOnUiThread(() -> {
+                    pairingEndpoint.setText(pairingHost + ":" + pairingPort);
+                    connectEndpoint.setText(connectHost + ":" + connectPort);
+                    status.setText("Watch found — enter the 6-digit code and tap Pair & install.");
+                    pairingCode.requestFocus();
+                });
+            }
+
+            @Override
+            public void onStatus(String text) {
+                runOnUiThread(() -> status.setText(text));
+            }
+        });
+        discovery.start();
+    }
+
+    @Override
+    protected void onStop() {
+        if (discovery != null) {
+            discovery.stop();
+            discovery = null;
+        }
+        super.onStop();
     }
 
     private EditText field(String hint, int type) {
