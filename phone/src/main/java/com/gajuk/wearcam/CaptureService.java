@@ -57,6 +57,7 @@ public class CaptureService extends Service {
     private final Paint btPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
     private long lastFrameAt;
     private long lastImageAt;
+    private long lastCameraRelaunch;
     private long lastBtAt;
     private long nextH264At;
 
@@ -149,8 +150,30 @@ public class CaptureService extends Service {
                 }
                 long idle = SystemClock.uptimeMillis() - lastImageAt;
                 if (lastImageAt > 0 && idle > 3000) {
-                    Log.w(TAG, "no projection frames for " + idle
-                            + "ms — screen off or static?");
+                    android.app.KeyguardManager keyguard =
+                            (android.app.KeyguardManager) getSystemService(KEYGUARD_SERVICE);
+                    boolean locked = keyguard != null && keyguard.isKeyguardLocked();
+                    Log.w(TAG, "no projection frames for " + idle + "ms"
+                            + (locked ? " — phone is LOCKED (unlock to resume)"
+                                      : " — camera backgrounded?"));
+                    if (!locked && idle > 5000 && BtBridge.isConnected()) {
+                        long now2 = SystemClock.uptimeMillis();
+                        if (now2 - lastCameraRelaunch > 15000) {
+                            lastCameraRelaunch = now2;
+                            Log.w(TAG, "reopening the camera to resume the stream");
+                            if (!CameraModes.setMode(this, CameraModes.PHOTO)) {
+                                try {
+                                    android.content.Intent cameraIntent = new android.content.Intent(
+                                            android.provider.MediaStore
+                                                    .INTENT_ACTION_STILL_IMAGE_CAMERA);
+                                    cameraIntent.addFlags(
+                                            android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                                    startActivity(cameraIntent);
+                                } catch (Exception ignored) {
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }, "capture-watchdog").start();
