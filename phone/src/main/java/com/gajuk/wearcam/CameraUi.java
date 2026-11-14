@@ -116,6 +116,20 @@ public final class CameraUi {
         return new ArrayList<>(modes);
     }
 
+    /** Numeric zoom preset labels visible in the tree ("0.6", "1", "2", "3.5", "7"). */
+    public static List<String> discoverZooms(AccessibilityNodeInfo root) {
+        Set<String> labels = new LinkedHashSet<>();
+        for (AccessibilityNodeInfo node : breadthFirst(root)) {
+            CharSequence label = node.getText();
+            if (label == null) continue;
+            String value = label.toString().trim().toLowerCase(Locale.ROOT).replace("×", "x");
+            if (value.matches("\\d+(\\.\\d+)?x?")) {
+                labels.add(value.replace("x", ""));
+            }
+        }
+        return new ArrayList<>(labels);
+    }
+
     /** Zoom preset by label ("1", "3.5", "0.6"), tolerant of the × suffix. */
     public static AccessibilityNodeInfo findZoom(AccessibilityNodeInfo root, String value) {
         if (root == null || value == null) return null;

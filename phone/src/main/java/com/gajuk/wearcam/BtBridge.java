@@ -210,7 +210,16 @@ public class BtBridge {
     }
 
     public static String statusLine() {
-        String mode = lastMode.isEmpty() ? "?" : lastMode;
+        String mode = lastMode;
+        ShutterService service = ShutterService.instance;
+        if (service != null) {
+            String current = service.currentMode();
+            if (current != null && !current.isEmpty()) {
+                mode = current;
+                lastMode = current;
+            }
+        }
+        if (mode.isEmpty()) mode = "?";
         int battery = -1;
         int thermal = -1;
         Context ctx = appContext;
@@ -221,9 +230,13 @@ public class BtBridge {
             if (pm != null) thermal = pm.getCurrentThermalStatus();
         }
         String modes = "";
-        ShutterService service = ShutterService.instance;
-        if (service != null) modes = service.availableModes();
-        return "MODE=" + mode + ";BAT=" + battery + ";TH=" + thermal + ";MODES=" + modes;
+        String zoom = "";
+        if (service != null) {
+            modes = service.availableModes();
+            zoom = service.zoomLabels();
+        }
+        return "MODE=" + mode + ";BAT=" + battery + ";TH=" + thermal
+                + ";MODES=" + modes + ";ZOOM=" + zoom;
     }
 
     public static void sendStatus(String text) {

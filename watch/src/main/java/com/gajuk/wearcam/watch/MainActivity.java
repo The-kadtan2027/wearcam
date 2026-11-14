@@ -72,6 +72,10 @@ public class MainActivity extends Activity implements BtClient.Listener {
     private final android.os.Handler ui = new android.os.Handler(android.os.Looper.getMainLooper());
 
     private TextView timerPill;
+    private TextView zoomOut;
+    private TextView zoomIn;
+    private volatile String zoomOutLabel = "1";
+    private volatile String zoomInLabel = "3.5";
     private TextView countdownView;
     private volatile boolean timerArmed;
 
@@ -240,9 +244,9 @@ public class MainActivity extends Activity implements BtClient.Listener {
         controls.setOrientation(LinearLayout.HORIZONTAL);
         controls.setGravity(Gravity.CENTER_VERTICAL);
 
-        TextView zoomOut = new TextView(this);
+        zoomOut = new TextView(this);
         pill(zoomOut, "1×");
-        zoomOut.setOnClickListener(v -> sendCmd("Z:1"));
+        zoomOut.setOnClickListener(v -> sendCmd("Z:" + zoomOutLabel));
         controls.addView(zoomOut, new LinearLayout.LayoutParams(dp(42), dp(32)));
 
         shutterView = new ShutterView(this);
@@ -259,9 +263,9 @@ public class MainActivity extends Activity implements BtClient.Listener {
         shutterParams.rightMargin = dp(8);
         controls.addView(shutterView, shutterParams);
 
-        TextView zoomIn = new TextView(this);
+        zoomIn = new TextView(this);
         pill(zoomIn, "3.5×");
-        zoomIn.setOnClickListener(v -> sendCmd("Z:3.5"));
+        zoomIn.setOnClickListener(v -> sendCmd("Z:" + zoomInLabel));
         controls.addView(zoomIn, new LinearLayout.LayoutParams(dp(42), dp(32)));
 
         FrameLayout.LayoutParams controlsParams = new FrameLayout.LayoutParams(
@@ -430,6 +434,36 @@ public class MainActivity extends Activity implements BtClient.Listener {
         vibrate(25);
     }
 
+    private void applyZoomLabels(String csv) {
+        List<String> labels = ModeList.parse(csv);
+        if (labels.size() < 2) return;
+        final String left = closest(labels, 1f);
+        final String right = closest(labels, 3.5f);
+        zoomOutLabel = left;
+        zoomInLabel = right;
+        runOnUiThread(() -> {
+            if (zoomOut != null) zoomOut.setText(left + "×");
+            if (zoomIn != null) zoomIn.setText(right + "×");
+        });
+    }
+
+    private static String closest(List<String> labels, float target) {
+        String best = labels.get(0);
+        float bestDiff = Float.MAX_VALUE;
+        for (String label : labels) {
+            try {
+                float value = Float.parseFloat(label);
+                float diff = Math.abs(value - target);
+                if (diff < bestDiff) {
+                    bestDiff = diff;
+                    best = label;
+                }
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return best;
+    }
+
     private final Runnable modeTimeout = () -> {
         mode.timeout();
         refreshStatus();
@@ -519,6 +553,9 @@ public class MainActivity extends Activity implements BtClient.Listener {
                 if (parts[i].startsWith("TH=")) thermal = parts[i].substring(3);
                 if (parts[i].startsWith("MODES=")) {
                     availableModes = ModeList.parse(parts[i].substring(6));
+                }
+                if (parts[i].startsWith("ZOOM=")) {
+                    applyZoomLabels(parts[i].substring(5));
                 }
             }
             StringBuilder detail = new StringBuilder();

@@ -70,6 +70,19 @@ content-description and view-id, with coordinate fallbacks. Brand profiles
 Adding a brand is usually just a `CameraProfile` entry (package + hint words);
 no automation code changes.
 
+## One-time calibration
+
+Some cameras (including ColorOS) draw their controls outside the accessibility tree.
+The phone app's **Calibrate camera** wizard records five taps through a transparent
+overlay — shutter, VIDEO, PHOTO, PORTRAIT and the 1× zoom preset — and verifies each
+mode point by tapping it and checking that the camera actually switched (small vertical
+offsets cover bars whose touch target sits below the label). The mapping is stored per
+camera package and drives the shutter, mode switching, zoom presets and the strip crop;
+the phone reports the resulting `MODES=`/`ZOOM=` lists to the watch, so the pill cycles
+this camera's modes instead of the OPPO defaults.
+
+Without a calibration the generic accessibility heuristics apply.
+
 ## Build
 
 ```

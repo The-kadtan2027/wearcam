@@ -203,11 +203,21 @@ public class CaptureService extends Service {
         if (now - lastStripAt >= 300) {
             lastStripAt = now;
             try {
+                android.graphics.Rect bar = ShutterService.barInFrame(
+                        full.getWidth(), full.getHeight());
+                int left = 0;
+                int right = full.getWidth();
                 int top = (int) (full.getHeight() * 0.865f);
                 int bottom = (int) (full.getHeight() * 0.955f);
+                if (bar != null && bar.width() > 0 && bar.height() > 0) {
+                    left = bar.left;
+                    right = bar.right;
+                    top = bar.top;
+                    bottom = bar.bottom;
+                }
                 if (btStrip == null) btStrip = Bitmap.createBitmap(480, 96, Bitmap.Config.ARGB_8888);
                 Canvas stripCanvas = new Canvas(btStrip);
-                stripCanvas.drawBitmap(full, new Rect(0, top, full.getWidth(), bottom),
+                stripCanvas.drawBitmap(full, new Rect(left, top, right, bottom),
                         new Rect(0, 0, 480, 96), btPaint);
                 ByteArrayOutputStream stripOut = new ByteArrayOutputStream(16384);
                 btStrip.compress(Bitmap.CompressFormat.JPEG, 60, stripOut);

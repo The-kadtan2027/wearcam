@@ -133,6 +133,9 @@ public class MainActivity extends Activity {
         }));
         actions.addView(separator());
         actions.addView(actionRow("Enable accessibility", true, this::enableAccessibility));
+        actions.addView(separator());
+        actions.addView(actionRow("Calibrate camera", true,
+                () -> startActivity(new Intent(this, CalibrationActivity.class))));
         root.addView(actions, cardParams());
 
         TextView foot = text("Open the OPPO Camera app after starting the stream.\n"
