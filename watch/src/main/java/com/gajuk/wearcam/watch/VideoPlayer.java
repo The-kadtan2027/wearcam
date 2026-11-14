@@ -13,6 +13,9 @@ public class VideoPlayer {
     private static final long MAX_AGE_MS = 250;
 
     private final Surface surface;
+    private byte[] csd;
+    private long lastOutputAt;
+    private Runnable keyframeRequest;
     private MediaCodec codec;
     private volatile boolean configured;
     private int frames;
@@ -27,7 +30,12 @@ public class VideoPlayer {
         this.surface = surface;
     }
 
+    public void setKeyframeRequest(Runnable keyframeRequest) {
+        this.keyframeRequest = keyframeRequest;
+    }
+
     public synchronized void configure(byte[] csd) {
+        this.csd = csd;
         release();
         try {
             MediaFormat format = MediaFormat.createVideoFormat("video/avc", 480, 480);
@@ -60,6 +68,18 @@ public class VideoPlayer {
             dropped++;
             return;
         }
+        long nowMs = SystemClock.elapsedRealtime();
+        if (configured && lastOutputAt > 0 && nowMs - lastOutputAt > 1500) {
+            android.util.Log.w("WearCamV", "decoder stalled for " + (nowMs - lastOutputAt)
+                    + "ms, resetting");
+            byte[] saved = csd;
+            release();
+            if (saved != null) configure(saved);
+            Runnable request = keyframeRequest;
+            if (request != null) request.run();
+            lastOutputAt = nowMs;
+            return;
+        }
         try {
             int index = codec.dequeueInputBuffer(0);
             if (index >= 0) {
@@ -67,10 +87,10 @@ public class VideoPlayer {
                 if (buffer != null) {
                     buffer.clear();
                     buffer.put(data);
-                    // Presentation time is the arrival time: live frames must not be paced
-                    // against the phone's clock, whose offset is unknown.
-                    codec.queueInputBuffer(index, 0, data.length,
-                            SystemClock.elapsedRealtime() * 1000, 0);
+                    // The surface renders on the MONOTONIC clock (System.nanoTime), not
+                    // elapsedRealtime (which includes suspend time). Using the wrong clock
+                    // schedules frames into the future once the watch has slept.
+                    codec.queueInputBuffer(index, 0, data.length, System.nanoTime() / 1000, 0);
                 }
             }
             frames++;
@@ -102,6 +122,7 @@ public class VideoPlayer {
                 if (out >= 0) {
                     codec.releaseOutputBuffer(out, true);
                     outputs++;
+                    lastOutputAt = SystemClock.elapsedRealtime();
                 } else {
                     break;
                 }

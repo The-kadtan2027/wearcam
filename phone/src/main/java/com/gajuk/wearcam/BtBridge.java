@@ -162,6 +162,11 @@ public class BtBridge {
                     new Thread(() -> loopbackBar(bx, by), "bt-bar").start();
                     break;
                 }
+                case 'K': {
+                    Runnable kf = keyframeRequest;
+                    if (kf != null) kf.run();
+                    break;
+                }
                 case 'Q':
                     if (s != null) {
                         String m = s.currentMode();

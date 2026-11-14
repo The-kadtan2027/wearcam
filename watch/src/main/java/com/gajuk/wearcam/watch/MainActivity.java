@@ -117,6 +117,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
             @Override
             public void surfaceCreated(android.view.SurfaceHolder holder) {
                 player = new VideoPlayer(holder.getSurface());
+                player.setKeyframeRequest(() -> sendCmd("K"));
                 byte[] csd = pendingCsd;
                 if (csd != null) player.configure(csd);
             }
