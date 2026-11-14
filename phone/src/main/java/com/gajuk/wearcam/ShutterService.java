@@ -3,7 +3,9 @@ package com.gajuk.wearcam;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.graphics.Path;
+import android.content.Intent;
 import android.graphics.Rect;
+import android.provider.MediaStore;
 import android.util.DisplayMetrics;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -15,6 +17,7 @@ public class ShutterService extends AccessibilityService {
     public static volatile ShutterService instance;
 
     private volatile long lastModePush;
+    private volatile String activePackage;
 
     @Override
     protected void onServiceConnected() {
@@ -37,6 +40,7 @@ public class ShutterService extends AccessibilityService {
                 && type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             return;
         }
+        if (event.getPackageName() != null) activePackage = event.getPackageName().toString();
         long now = System.currentTimeMillis();
         if (now - lastModePush < 300) return;
         lastModePush = now;
@@ -53,30 +57,71 @@ public class ShutterService extends AccessibilityService {
 
     private final RecordMachine record = new RecordMachine();
 
+    public CameraProfile profile() {
+        return CameraProfile.forPackage(activePackage);
+    }
+
     public boolean clickShutter() {
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return false;
-        String mode = currentMode();
-        String status = record.click("VIDEO".equals(mode));
-        AccessibilityNodeInfo node = find(root, "shutter");
-        if (node == null) {
-            dispatchTap(realWidth() * 0.5f, realHeight() * 0.816f);
-            BtBridge.sendStatus(status);
-            return true;
-        }
-        AccessibilityNodeInfo clickable = node;
-        while (clickable != null && !clickable.isClickable()) {
-            clickable = clickable.getParent();
-        }
-        if (clickable != null && clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+        boolean video = "VIDEO".equalsIgnoreCase(currentMode());
+        String status = record.click(video);
+        AccessibilityNodeInfo node = CameraUi.find(root,
+                video ? profile().videoHints : profile().shutterHints,
+                video ? new String[]{"record", "stop"} : new String[]{"shutter", "capture"});
+        if (node != null && CameraUi.click(node)) {
             BtBridge.sendStatus(status);
             return true;
         }
         Rect r = new Rect();
-        node.getBoundsInScreen(r);
-        dispatchTap(r.centerX(), r.centerY());
+        if (node != null) {
+            node.getBoundsInScreen(r);
+            dispatchTap(r.centerX(), r.centerY());
+        } else {
+            dispatchTap(realWidth() * 0.5f, realHeight() * 0.816f);
+        }
         BtBridge.sendStatus(status);
         return true;
+    }
+
+    /** Switch the camera to a mode by name: carousel node first, OPPO intent, then launch+retry. */
+    public boolean setMode(String name) {
+        if (name == null || name.isEmpty()) return false;
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        if (root != null) {
+            AccessibilityNodeInfo node = CameraUi.findMode(root, name);
+            if (node != null && CameraUi.click(node)) return true;
+        }
+        Integer code = CameraModes.codeFor(name);
+        if (code != null && CameraModes.setMode(this, code)) return true;
+        launchCamera();
+        try {
+            Thread.sleep(1200);
+        } catch (InterruptedException ignored) {
+        }
+        root = getRootInActiveWindow();
+        if (root != null) {
+            AccessibilityNodeInfo node = CameraUi.findMode(root, name);
+            return node != null && CameraUi.click(node);
+        }
+        return false;
+    }
+
+    /** Comma-separated mode labels the camera currently exposes, for the watch's cycle. */
+    public String availableModes() {
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        if (root == null) return "";
+        java.util.List<String> modes = CameraUi.discoverModes(root, profile());
+        return String.join(",", modes);
+    }
+
+    private void launchCamera() {
+        try {
+            Intent intent = new Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+        } catch (Exception ignored) {
+        }
     }
 
     public boolean tapBar(float x480, float y96) {
@@ -107,6 +152,11 @@ public class ShutterService extends AccessibilityService {
     }
 
     public boolean zoomPreset(String value) {
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        if (root != null) {
+            AccessibilityNodeInfo node = CameraUi.findZoom(root, value);
+            if (node != null && CameraUi.click(node)) return true;
+        }
         float fraction;
         switch (value) {
             case "0.6": fraction = 0.315f; break;
@@ -191,6 +241,8 @@ public class ShutterService extends AccessibilityService {
     public String currentMode() {
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return null;
+        String selected = CameraUi.selectedMode(root, profile());
+        if (selected != null) return selected;
         AccessibilityNodeInfo node = findDescription(root, "mode,");
         if (node == null) return null;
         String desc = node.getContentDescription().toString();

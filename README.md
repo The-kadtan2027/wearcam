@@ -38,8 +38,9 @@ Galaxy Watch 4 (450x450)                     OPPO Reno14 Pro 5G
   zoom, `B:<x>,<y>` mode-bar tap, `T:<x>,<y>` focus, `M:<n>` mode intent.
   The phone reports `SHOT`, `REC` / `STOP` (record start/stop) and
   `MODE=<name>;BAT=<pct>;TH=<thermal>` status lines.
-- **Modes**: deterministic intents discovered from the camera's launcher
-  shortcuts (`mode=0 photo, 2 portrait, 6 video`); PRO/MORE via the strip.
+- **Modes**: the phone reports the mode labels its camera exposes
+  (`MODES=PRO,VIDEO,PHOTO,PORTRAIT,MORE`); the watch cycles that list and sends
+  `MODE:<name>`. OPPO shortcut intents (`mode=0/2/6`) remain the fast path.
 - **Shutter**: accessibility click on the camera's shutter node, with a
   coordinate fallback at `(0.5w, 0.816h)` for the video record button.
 - **Timer**: the `3s` pill arms a 3-2-1 countdown before the shutter command.
@@ -49,6 +50,25 @@ Galaxy Watch 4 (450x450)                     OPPO Reno14 Pro 5G
   capture, record (phone) are explicit enum machines with logged transitions
   and JVM tests — see [STATE-MACHINES.md](STATE-MACHINES.md). Every transition
   appears in logcat as `WearCamState <machine>: FROM --EVENT--> TO`.
+
+## Camera compatibility
+
+The phone drives any camera app through the accessibility tree: the shutter,
+record button, mode carousel and zoom presets are found by text,
+content-description and view-id, with coordinate fallbacks. Brand profiles
+(`CameraProfile.java`) only supply the vocabulary; the automation
+(`CameraUi.java`) is shared.
+
+| Camera | Shutter / record | Modes | Zoom |
+|---|---|---|---|
+| OPPO (ColorOS) | node match + coordinate fallback | carousel node / shortcut intent | preset node / coordinate |
+| Samsung | content-desc/id match | carousel labels | preset text |
+| Google | content-desc/id match | carousel labels | preset text |
+| Xiaomi | content-desc/id match | carousel labels | preset text |
+| Other | keyword hints + coordinate fallback | carousel labels if exposed | pinch |
+
+Adding a brand is usually just a `CameraProfile` entry (package + hint words);
+no automation code changes.
 
 ## Build
 

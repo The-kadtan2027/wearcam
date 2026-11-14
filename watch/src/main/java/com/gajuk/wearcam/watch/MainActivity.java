@@ -23,6 +23,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.gajuk.wearcam.common.ModeList;
 import com.gajuk.wearcam.watch.state.CountdownMachine;
 import com.gajuk.wearcam.watch.state.LinkMachine;
 import com.gajuk.wearcam.watch.state.ModeMachine;
@@ -34,6 +35,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends Activity implements BtClient.Listener {
 
@@ -61,6 +64,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
     private BtClient bt;
 
     private volatile String phoneDetail = "";
+    private volatile List<String> availableModes = new ArrayList<>();
     private long lastStripTapAt;
     private int lastBarX;
     private int lastBarY;
@@ -403,15 +407,25 @@ public class MainActivity extends Activity implements BtClient.Listener {
     }
 
     private void cycleModeIntent() {
+        String next = ModeList.next(availableModes, mode.confirmed());
+        if (next != null) {
+            mode.request(next);
+            ui.removeCallbacks(modeTimeout);
+            ui.postDelayed(modeTimeout, 3000);
+            sendCmd("MODE:" + next);
+            refreshStatus();
+            vibrate(25);
+            return;
+        }
         String current = mode.confirmed();
-        int next;
-        if ("PHOTO".equalsIgnoreCase(current)) next = 2;
-        else if ("PORTRAIT".equalsIgnoreCase(current)) next = 6;
-        else next = 0;
-        mode.request(next == 2 ? "PORTRAIT" : next == 6 ? "VIDEO" : "PHOTO");
+        int code;
+        if ("PHOTO".equalsIgnoreCase(current)) code = 2;
+        else if ("PORTRAIT".equalsIgnoreCase(current)) code = 6;
+        else code = 0;
+        mode.request(code == 2 ? "PORTRAIT" : code == 6 ? "VIDEO" : "PHOTO");
         ui.removeCallbacks(modeTimeout);
         ui.postDelayed(modeTimeout, 3000);
-        sendCmd("M:" + next);
+        sendCmd("M:" + code);
         refreshStatus();
         vibrate(25);
     }
@@ -503,6 +517,9 @@ public class MainActivity extends Activity implements BtClient.Listener {
             for (int i = 1; i < parts.length; i++) {
                 if (parts[i].startsWith("BAT=")) battery = parts[i].substring(4);
                 if (parts[i].startsWith("TH=")) thermal = parts[i].substring(3);
+                if (parts[i].startsWith("MODES=")) {
+                    availableModes = ModeList.parse(parts[i].substring(6));
+                }
             }
             StringBuilder detail = new StringBuilder();
             if (!battery.isEmpty() && !battery.equals("-1")) detail.append(battery).append('%');

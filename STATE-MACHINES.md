@@ -21,7 +21,7 @@ transition, and JVM tests.
 |---|---|---|---|---|
 | `link` | watch | `IDLE`, `CONNECTING`, `CONNECTED`, `RECONNECTING`, `UNAVAILABLE` | `START`, `CONNECTED`, `LOST`, `RETRY`, `NO_PHONE`, `UNAVAILABLE` | capsule text + spinner, reconnect semantics |
 | `transport` | watch | `BT`, `WIFI_CONNECTING`, `WIFI` | `WIFI_CONNECT`, `WIFI_OPEN`, `WIFI_CLOSED` | which source may feed the decoder, `wifi`/`bt` label |
-| `mode` | watch | `SYNCED`, `REQUESTING` | `REQUEST`, `CONFIRM`, `TIMEOUT` | mode pill; optimistic request reverts after 3 s without confirmation |
+| `mode` | watch | `SYNCED`, `REQUESTING` | `REQUEST`, `CONFIRM`, `TIMEOUT` | mode pill over the phone-reported mode list; optimistic request reverts after 3 s without confirmation |
 | `countdown` | watch | `IDLE`, `COUNTING` | `START`, `FINISH`, `CANCEL` | 3 s timer; a second press cannot start an overlapping countdown |
 | `recording` | watch | `IDLE`, `RECORDING` | `START`, `STOP` | `REC m:ss` counter and its timestamp |
 | `capture` | phone | `IDLE`, `STARTING`, `STREAMING`, `STOPPING`, `ERROR` | `REQUEST`, `STARTED`, `STOP`, `FAILED`, `DESTROYED` | stream lifecycle; duplicate start cannot create a second virtual display |

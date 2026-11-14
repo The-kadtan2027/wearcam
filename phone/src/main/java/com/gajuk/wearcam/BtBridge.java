@@ -142,8 +142,12 @@ public class BtBridge {
                     s.zoomPreset(cmd.substring(Math.min(2, cmd.length())));
                     break;
                 case 'M': {
-                    int mode = Integer.parseInt(cmd.substring(Math.min(2, cmd.length())));
-                    CameraModes.setMode(appContext, mode);
+                    if (cmd.startsWith("MODE:")) {
+                        s.setMode(cmd.substring(5).trim());
+                    } else {
+                        int mode = Integer.parseInt(cmd.substring(Math.min(2, cmd.length())));
+                        CameraModes.setMode(appContext, mode);
+                    }
                     break;
                 }
                 case 'T': {
@@ -216,7 +220,10 @@ public class BtBridge {
             PowerManager pm = (PowerManager) ctx.getSystemService(Context.POWER_SERVICE);
             if (pm != null) thermal = pm.getCurrentThermalStatus();
         }
-        return "MODE=" + mode + ";BAT=" + battery + ";TH=" + thermal;
+        String modes = "";
+        ShutterService service = ShutterService.instance;
+        if (service != null) modes = service.availableModes();
+        return "MODE=" + mode + ";BAT=" + battery + ";TH=" + thermal + ";MODES=" + modes;
     }
 
     public static void sendStatus(String text) {
