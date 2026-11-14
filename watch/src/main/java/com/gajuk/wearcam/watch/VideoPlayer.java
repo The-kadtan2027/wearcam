@@ -10,7 +10,7 @@ import java.nio.ByteBuffer;
 
 public class VideoPlayer {
 
-    private static final long MAX_AGE_MS = 150;
+    private static final long MAX_AGE_MS = 250;
 
     private final Surface surface;
     private MediaCodec codec;
@@ -36,6 +36,7 @@ public class VideoPlayer {
                 format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1);
             }
             codec = MediaCodec.createDecoderByType("video/avc");
+            android.util.Log.i("WearCamV", "decoder codec=" + codec.getName());
             codec.configure(format, surface, null, 0);
             codec.start();
             configured = true;

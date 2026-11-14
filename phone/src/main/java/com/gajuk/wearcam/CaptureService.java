@@ -57,7 +57,7 @@ public class CaptureService extends Service {
     private final Paint btPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
     private long lastFrameAt;
     private long lastBtAt;
-    private long lastH264At;
+    private long nextH264At;
 
     @Override
     public void onCreate() {
@@ -126,7 +126,7 @@ public class CaptureService extends Service {
 
         Log.i(TAG, "creating encoder");
         try {
-            encoder = new H264Encoder(480, 480, 30, 2_500_000);
+            encoder = new H264Encoder(480, 480, 20, 2_500_000);
             encoder.start();
         } catch (Throwable t) {
             Log.w(TAG, "h264 unavailable: " + t);
@@ -170,8 +170,10 @@ public class CaptureService extends Service {
             Bitmap out = padded;
             if (rowPadding != 0) out = Bitmap.createBitmap(padded, 0, 0, W, H);
 
-            if (encoder != null && now - lastH264At >= 20) {
-                lastH264At = now;
+            if (encoder != null && now >= nextH264At) {
+                // Even 20 fps pacing: a time threshold on a ~33 ms capture cadence drops in
+                // bursts (33 ms + 33 ms = 66 ms), which is what caused the stutter.
+                nextH264At = Math.max(now, nextH264At + 50);
                 Bitmap target = encoder.acquire();
                 if (target != null) {
                     int side = Math.min(out.getWidth(), out.getHeight());

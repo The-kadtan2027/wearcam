@@ -89,8 +89,11 @@ The watch stream targets low, **bounded** latency rather than maximum frame rate
 
 - The watch stamps decoder input with the frame's arrival time instead of a synthetic PTS, so
   the renderer never paces behind real time.
-- Frames older than 150 ms are dropped **before** the decoder: MediaCodec's internal queue is
+- Frames older than 250 ms are dropped **before** the decoder (safety net only: with even pacing the decoder drops nothing): MediaCodec's internal queue is
   unbounded, so age-based dropping is what keeps end-to-end latency flat instead of growing.
+- The phone streams at an **even 20 fps** (50 ms pacing against the ~33 ms capture cadence).
+  A time threshold on a 33 ms cadence drops in bursts (33+33 = 66 ms), which is what made the
+  video stutter; even pacing lets the watch decode every frame (`drop=0`).
 - The encoder keeps only the newest frame (latest-wins queue) and uses Baseline AVC (no
   B-frames) with a low-latency hint.
 - TCP fan-out uses one sender thread per client with a two-packet drop-oldest queue, so a slow
