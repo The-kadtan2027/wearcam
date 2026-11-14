@@ -4,7 +4,7 @@ plugins {
 
 android {
     namespace 'com.gajuk.wearcam'
-    compileSdk 35
+    compileSdk 37
 
     defaultConfig {
         applicationId "com.gajuk.wearcam"
@@ -46,5 +46,7 @@ tasks.named('preBuild') {
 
 dependencies {
     implementation project(":common")
+    implementation "com.flyfishxu:kadb:2.1.1"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1"
     testImplementation "junit:junit:4.13.2"
 }

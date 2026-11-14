@@ -4,7 +4,7 @@ plugins {
 
 android {
     namespace 'com.gajuk.wearcam.watch'
-    compileSdk 35
+    compileSdk 37
 
     defaultConfig {
         applicationId "com.gajuk.wearcam.watch"

@@ -32,6 +32,11 @@
             android:name=".CalibrationActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".WatchInstallActivity"
+            android:exported="false" />
+
+
         <provider
             android:name=".CaptureProvider"
             android:authorities="com.gajuk.wearcam.capture"

@@ -150,6 +150,9 @@ public class MainActivity extends Activity {
         watchCard.addView(separator());
         watchCard.addView(actionRow("Send update to watch", true, this::sendUpdateToWatch));
         watchCard.addView(separator());
+        watchCard.addView(actionRow("Install on watch via Wi-Fi", true,
+                () -> startActivity(new Intent(this, WatchInstallActivity.class))));
+        watchCard.addView(separator());
         watchCard.addView(actionRow("Install guide", true, this::showInstallGuide));
         root.addView(watchCard, cardParams());
 

@@ -33,6 +33,19 @@ The phone app ships the watch APK:
 
 Any Wear OS sideload helper (for example a phone-side ADB tool) can replace the PC step.
 
+### Option B2 — install from the phone itself (no PC, no store)
+
+The phone can pair with the watch's wireless debugging and push the APK directly:
+
+1. On the watch: **Developer options → Wireless debugging → Pair device with pairing code**.
+   Note the pairing IP:port and the 6-digit code; the main Wireless debugging screen shows
+   the connect IP:port.
+2. Phone app → **WATCH APP → Install on watch via Wi-Fi**.
+3. Enter the pairing IP:port, the code, and the connect IP:port → **Pair & install**.
+
+The pairing is a one-time step per watch; afterwards the phone installs/updates the app
+over Wi-Fi without any developer tool.
+
 ### Updating the watch app over Bluetooth (no PC)
 
 Once the watch app is installed, updates travel over the existing RFCOMM link:
