@@ -162,11 +162,9 @@ public class BtBridge {
                     new Thread(() -> loopbackBar(bx, by), "bt-bar").start();
                     break;
                 }
-                case 'K': {
-                    Runnable kf = keyframeRequest;
-                    if (kf != null) kf.run();
+                case 'K':
+                    requestKeyframe();
                     break;
-                }
                 case 'Q':
                     if (s != null) {
                         String m = s.currentMode();
@@ -268,6 +266,11 @@ public class BtBridge {
 
     public static void setKeyframeRequest(Runnable r) {
         keyframeRequest = r;
+    }
+
+    public static void requestKeyframe() {
+        Runnable kf = keyframeRequest;
+        if (kf != null) kf.run();
     }
 
     public static byte[] packet(int type, byte[] payload) {

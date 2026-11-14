@@ -57,6 +57,11 @@ public class VideoPlayer {
 
     /** @param phoneTsUs capture timestamp from the phone (0 when unknown). */
     public synchronized void feed(byte[] data, long phoneTsUs) {
+        feed(data, phoneTsUs, MAX_AGE_MS);
+    }
+
+    /** @param maxAgeMs frames older than this are dropped (BT frames are inherently later). */
+    public synchronized void feed(byte[] data, long phoneTsUs, long maxAgeMs) {
         if (!configured) {
             byte[] csd = extractCsd(data);
             if (csd == null) return;
@@ -64,7 +69,7 @@ public class VideoPlayer {
             if (!configured) return;
         }
         long age = ClockSync.latencyMs(phoneTsUs);
-        if (age > MAX_AGE_MS) {
+        if (age > maxAgeMs) {
             dropped++;
             return;
         }

@@ -98,7 +98,11 @@ The watch stream targets low, **bounded** latency rather than maximum frame rate
   B-frames) with a low-latency hint.
 - TCP fan-out uses one sender thread per client with a two-packet drop-oldest queue, so a slow
   client can never stall the encoder.
-- The watch uses a raw TCP socket with `TCP_NODELAY` and a 1 MiB receive buffer.
+- The watch uses a raw TCP socket with `TCP_NODELAY`, a 1 MiB receive buffer and a 4 s
+  read timeout; a stalled link reconnects instead of blocking forever.
+- The watch holds a high-performance `WifiLock` and a partial wake lock while streaming.
+- If Wi-Fi delivers no frame for 1.5 s, the watch **falls back to the BT H.264 stream**
+  (always connected) so the picture keeps moving instead of freezing on the last frame.
 - Status lines carry `UP=` (phone uptime) and video frames carry their capture timestamp; the
   watch estimates the clock offset and logs
   `dec fps=… in=… drop=… latency avg=…ms max=…ms`.

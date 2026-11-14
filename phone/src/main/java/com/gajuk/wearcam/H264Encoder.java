@@ -19,6 +19,7 @@ public class H264Encoder {
     private Thread drainThread;
     private volatile boolean running;
     private volatile long latestCaptureUs;
+    private long lastBtVideoAt;
     private boolean configSent;
     private int frameCount;
     private long fpsMark;
@@ -197,7 +198,11 @@ public class H264Encoder {
                                 payload[7 - i] = (byte) (captureUs >>> (8 * i));
                             }
                             System.arraycopy(data, 0, payload, 8, data.length);
-                            BtBridge.sendVideoFrame(payload);
+                            long btNow = android.os.SystemClock.uptimeMillis();
+                            if (btNow - lastBtVideoAt >= 100) {
+                                lastBtVideoAt = btNow;
+                                BtBridge.sendVideoFrame(payload);
+                            }
                             VideoHub.broadcast(BtBridge.packet(6, payload));
                             frameCount++;
                             long now = android.os.SystemClock.uptimeMillis();

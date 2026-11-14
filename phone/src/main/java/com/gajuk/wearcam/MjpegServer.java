@@ -82,6 +82,7 @@ public class MjpegServer {
                         + "Connection: keep-alive\r\n\r\n").getBytes("ISO-8859-1"));
                 os.flush();
                 VideoHub.add(os);
+                BtBridge.requestKeyframe();
                 try {
                     java.io.InputStream input = s.getInputStream();
                     while (input.read() != -1) {

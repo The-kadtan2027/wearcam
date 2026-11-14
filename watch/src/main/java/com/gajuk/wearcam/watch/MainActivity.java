@@ -81,6 +81,9 @@ public class MainActivity extends Activity implements BtClient.Listener {
 
 
     private volatile boolean httpRunning;
+    private volatile long lastWifiFrameAt;
+    private android.net.wifi.WifiManager.WifiLock wifiLock;
+    private android.os.PowerManager.WakeLock wakeLock;
     private Thread httpThread;
 
     @Override
@@ -305,6 +308,24 @@ public class MainActivity extends Activity implements BtClient.Listener {
         setContentView(root);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
+        android.net.wifi.WifiManager wifiManager =
+                (android.net.wifi.WifiManager) getApplicationContext()
+                        .getSystemService(WIFI_SERVICE);
+        if (wifiManager != null) {
+            wifiLock = wifiManager.createWifiLock(
+                    android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "wearcam:video");
+            wifiLock.setReferenceCounted(false);
+            wifiLock.acquire();
+        }
+        android.os.PowerManager powerManager =
+                (android.os.PowerManager) getSystemService(POWER_SERVICE);
+        if (powerManager != null) {
+            wakeLock = powerManager.newWakeLock(
+                    android.os.PowerManager.PARTIAL_WAKE_LOCK, "wearcam:cpu");
+            wakeLock.setReferenceCounted(false);
+            wakeLock.acquire();
+        }
+
         startForegroundService(new Intent(this, KeepAlive.class));
         attachClient(0);
         wifiVideoClient = new WifiVideo(getSharedPreferences("wearcam", 0)
@@ -316,7 +337,8 @@ public class MainActivity extends Activity implements BtClient.Listener {
 
             @Override
             public void onFrame(byte[] data, long tsUs) {
-                applyVideoFrame(data, tsUs);
+                lastWifiFrameAt = android.os.SystemClock.elapsedRealtime();
+                applyVideoFrame(data, tsUs, 250);
             }
 
             @Override
@@ -324,6 +346,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
                 transport.send(connected
                         ? TransportMachine.Event.WIFI_OPEN
                         : TransportMachine.Event.WIFI_CLOSED);
+                if (connected) lastWifiFrameAt = android.os.SystemClock.elapsedRealtime();
             }
         });
         transport.send(TransportMachine.Event.WIFI_CONNECT);
@@ -503,8 +526,14 @@ public class MainActivity extends Activity implements BtClient.Listener {
 
     @Override
     public void onVideoFrame(byte[] data, long tsUs) {
-        if (transport.isWifi()) return;
-        applyVideoFrame(data, tsUs);
+        // Prefer Wi-Fi, but keep the BT H.264 stream as a live fallback: when the Wi-Fi
+        // link stalls (Wear OS power save) no frames arrive for seconds, and dropping BT
+        // would freeze the picture.
+        if (transport.isWifi()
+                && android.os.SystemClock.elapsedRealtime() - lastWifiFrameAt < 1500) {
+            return;
+        }
+        applyVideoFrame(data, tsUs, 600);
     }
 
     private void applyVideoConfig(byte[] csd) {
@@ -514,9 +543,9 @@ public class MainActivity extends Activity implements BtClient.Listener {
         });
     }
 
-    private void applyVideoFrame(byte[] data, long tsUs) {
+    private void applyVideoFrame(byte[] data, long tsUs, long maxAgeMs) {
         VideoPlayer p = player;
-        if (p != null) p.feed(data, tsUs);
+        if (p != null) p.feed(data, tsUs, maxAgeMs);
         runOnUiThread(() -> {
             if (preview.getVisibility() != View.GONE) preview.setVisibility(View.GONE);
         });
@@ -722,6 +751,8 @@ public class MainActivity extends Activity implements BtClient.Listener {
         ui.removeCallbacks(countdownTick);
         ui.removeCallbacks(modeTimeout);
         countdown.cancel();
+        if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
+        if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
         stopHttp();
         if (bt != null) bt.setListener(null);
         super.onDestroy();

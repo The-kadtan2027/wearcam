@@ -60,6 +60,7 @@ public class WifiVideo {
                 socket = new Socket();
                 socket.setTcpNoDelay(true);
                 socket.setReceiveBufferSize(1 << 20);
+                socket.setSoTimeout(4000);
                 socket.connect(new InetSocketAddress(address, port), 1500);
 
                 OutputStream out = socket.getOutputStream();
