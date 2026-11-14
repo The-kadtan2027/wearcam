@@ -110,6 +110,31 @@ public final class CalibrationSession {
         if (l != null) l.onCaptured(step);
     }
 
+    /** First step that has neither been captured nor skipped. */
+    public synchronized Step nextStep() {
+        for (Step step : Step.values()) {
+            if (!has(step)) return step;
+        }
+        return null;
+    }
+
+    /** Centre of the point recorded for a step, or null. */
+    public synchronized float[] point(Step step) {
+        Calibration.Entry entry = captured.get(step);
+        if (entry == null || !entry.hasBounds()) return null;
+        return new float[]{(entry.left + entry.right) / 2f, (entry.top + entry.bottom) / 2f};
+    }
+
+    /** Replaces a step's point (used by the automatic mode-point verification). */
+    public synchronized void movePoint(Step step, float x, float y) {
+        Calibration.Entry entry = captured.get(step);
+        if (entry == null) return;
+        int half = 48;
+        captured.put(step, new Calibration.Entry(entry.role, entry.text, entry.desc, entry.id,
+                Math.max(0, Math.round(x) - half), Math.max(0, Math.round(y) - half),
+                Math.round(x) + half, Math.round(y) + half));
+    }
+
     public synchronized Calibration build(int screenWidth, int screenHeight) {
         Map<String, Calibration.Entry> byRole = new LinkedHashMap<>();
         for (Calibration.Entry entry : captured.values()) {

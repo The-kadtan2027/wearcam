@@ -660,7 +660,9 @@ public class MainActivity extends Activity implements BtClient.Listener {
         runOnUiThread(() -> {
             if (spinner != null) spinner.setVisibility(connected ? View.GONE : View.VISIBLE);
             if (modePill != null) modePill.setText(modeName);
-            if (shutterView != null) shutterView.setVideo("VIDEO".equalsIgnoreCase(modeName));
+            if (shutterView != null) {
+                shutterView.setVideo(modeName.toUpperCase().contains("VIDEO"));
+            }
             if (status != null) status.setText(text);
         });
         if (record.isRecording()) {

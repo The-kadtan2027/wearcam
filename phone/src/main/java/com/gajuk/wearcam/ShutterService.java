@@ -163,6 +163,10 @@ public class ShutterService extends AccessibilityService {
     /** Switch the camera to a mode by name: carousel node first, OPPO intent, then launch+retry. */
     public boolean setMode(String name) {
         if (name == null || name.isEmpty()) return false;
+        // The camera's mode carousel scrolls, so calibrated points drift. A deterministic
+        // shortcut intent (when the app provides one) is always preferable.
+        Integer code = CameraModes.codeFor(name);
+        if (code != null && CameraModes.setMode(this, code)) return true;
         AccessibilityNodeInfo root = getRootInActiveWindow();
         Calibration calibration = calibration(root);
         if (calibration != null) {
@@ -173,8 +177,6 @@ public class ShutterService extends AccessibilityService {
             AccessibilityNodeInfo node = CameraUi.findMode(root, name);
             if (node != null && CameraUi.click(node)) return true;
         }
-        Integer code = CameraModes.codeFor(name);
-        if (code != null && CameraModes.setMode(this, code)) return true;
         launchCamera();
         try {
             Thread.sleep(1200);
@@ -410,7 +412,11 @@ public class ShutterService extends AccessibilityService {
         String desc = node.getContentDescription().toString();
         int i = desc.indexOf("mode");
         if (i <= 0) return null;
-        return desc.substring(0, i).trim().toUpperCase();
+        String name = desc.substring(0, i).trim().toUpperCase();
+        // OPPO appends the sub-mode ("VIDEO : STAGE") — the watch matches plain mode names.
+        int colon = name.indexOf(':');
+        if (colon > 0) name = name.substring(0, colon).trim();
+        return name.isEmpty() ? null : name;
     }
 
     private void dispatchTap(float x, float y) {

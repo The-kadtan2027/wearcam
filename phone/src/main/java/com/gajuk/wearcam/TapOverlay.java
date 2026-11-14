@@ -13,11 +13,11 @@ import android.widget.FrameLayout;
 import android.widget.TextView;
 
 /**
- * Transparent full-screen overlay that captures the first tap's screen coordinates.
+ * Transparent full-screen overlay that reports every tap's screen coordinates.
  *
- * <p>Used by the calibration wizard because several camera apps (including ColorOS) draw their
- * controls outside the accessibility tree. The overlay consumes the tap, records the point and
- * removes itself; the camera underneath stays visible the whole time.
+ * <p>Used by the one-go calibration: the user opens the camera once and taps each control in
+ * sequence; the banner updates with the next instruction and the overlay stays until the owner
+ * dismisses it.
  */
 public final class TapOverlay {
 
@@ -25,12 +25,20 @@ public final class TapOverlay {
         void onTap(float x, float y);
     }
 
-    private TapOverlay() {
+    private final WindowManager windowManager;
+    private final FrameLayout root;
+    private final TextView banner;
+
+    private TapOverlay(WindowManager windowManager, FrameLayout root, TextView banner) {
+        this.windowManager = windowManager;
+        this.root = root;
+        this.banner = banner;
     }
 
-    public static void show(Context context, String hint, Listener listener) {
-        WindowManager wm = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
-        if (wm == null) return;
+    public static TapOverlay show(Context context, String hint, Listener listener) {
+        WindowManager windowManager =
+                (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+        if (windowManager == null) return null;
 
         FrameLayout root = new FrameLayout(context);
         TextView banner = new TextView(context);
@@ -51,13 +59,7 @@ public final class TapOverlay {
 
         root.setOnTouchListener((view, event) -> {
             if (event.getAction() == MotionEvent.ACTION_UP) {
-                float x = event.getRawX();
-                float y = event.getRawY();
-                try {
-                    wm.removeView(root);
-                } catch (Exception ignored) {
-                }
-                listener.onTap(x, y);
+                listener.onTap(event.getRawX(), event.getRawY());
             }
             return true;
         });
@@ -72,7 +74,20 @@ public final class TapOverlay {
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT);
         try {
-            wm.addView(root, lp);
+            windowManager.addView(root, lp);
+        } catch (Exception e) {
+            return null;
+        }
+        return new TapOverlay(windowManager, root, banner);
+    }
+
+    public void setHint(String hint) {
+        banner.setText(hint);
+    }
+
+    public void dismiss() {
+        try {
+            windowManager.removeView(root);
         } catch (Exception ignored) {
         }
     }
