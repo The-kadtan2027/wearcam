@@ -2,7 +2,7 @@
 
 ## Phone app
 
-1. Download `phone-debug.apk` from the [latest release](https://github.com/The-kadtan2027/wearcam/releases/latest).
+1. Download `wearcam-phone-<version>.apk` from the [latest release](https://github.com/The-kadtan2027/wearcam/releases/latest).
 2. Allow installs from the browser/file manager, then open the APK.
 3. Open WearCam Phone → grant the camera permission → **Enable accessibility** → **Start streaming** → open the camera app.
 4. Optional: **Calibrate camera** (one go: five taps) so the watch's modes match this camera app.
@@ -20,6 +20,7 @@ The phone app ships the watch APK:
 
 1. Phone app → scroll to **WATCH APP** → **Export & share APK**. The APK is saved to
    `Downloads/WearCam-watch.apk` and a share sheet opens (Bluetooth, email, Drive…).
+   (The same APK ships in the release as `wearcam-watch-<version>.apk`.)
 2. On the watch: **Settings → About → tap Build number 7×**, then **Developer options →
    Wireless debugging → on**. Note the IP:port shown.
 3. On a PC with adb:
