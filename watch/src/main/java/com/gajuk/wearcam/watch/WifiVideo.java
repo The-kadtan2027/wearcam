@@ -48,9 +48,17 @@ public class WifiVideo {
 
     private void loop() {
         while (running) {
+            String address = host;
+            if (address == null || address.isEmpty()) {
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    break;
+                }
+                continue;
+            }
             Socket socket = null;
             try {
-                String address = host;
                 int port = 8080;
                 int colon = address.lastIndexOf(':');
                 if (colon > 0) {

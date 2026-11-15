@@ -291,7 +291,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
         ipField.setTextSize(12);
         ipField.setSingleLine(true);
         ipField.setText(getSharedPreferences("wearcam", 0)
-                .getString("host", "192.168.1.6:8080"));
+                .getString("host", ""));
         config.addView(ipField);
         Button wifi = new Button(this);
         style(wifi, "Use Wi-Fi stream", 0xFF2F6FED, 0xFFFFFFFF, 11);
@@ -332,7 +332,7 @@ public class MainActivity extends Activity implements BtClient.Listener {
         startForegroundService(new Intent(this, KeepAlive.class));
         attachClient(0);
         wifiVideoClient = new WifiVideo(getSharedPreferences("wearcam", 0)
-                .getString("host", "192.168.1.6:8080"), new WifiVideo.Listener() {
+                .getString("host", ""), new WifiVideo.Listener() {
             @Override
             public void onConfig(byte[] csd) {
                 applyVideoConfig(csd);

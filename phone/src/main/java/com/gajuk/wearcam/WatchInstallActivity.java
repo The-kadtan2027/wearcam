@@ -54,7 +54,7 @@ public class WatchInstallActivity extends Activity {
         find.setOnClickListener(v -> findWatch());
         root.addView(find);
 
-        pairingEndpoint = field("Pairing IP:port (e.g. 192.168.1.19:37000)",
+        pairingEndpoint = field("Pairing IP:port (e.g. 192.168.1.10:37000)",
                 InputType.TYPE_CLASS_TEXT);
         root.addView(pairingEndpoint);
         pairingCode = field("Pairing code", InputType.TYPE_CLASS_NUMBER);
